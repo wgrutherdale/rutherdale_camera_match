@@ -1,0 +1,60 @@
+Tuesday 7 July 2015
+
+
+Notes on Input Files
+====================
+
+I went through entire products.txt and confirmed visually line-by-line that
+all entries appear to be actual cameras, as opposed to accessories.
+
+Listings.txt, however, appears to contain very large number of entries that
+are accessories for camera models, rather than just cameras.
+
+Objective appears to match even accessories accurately against the product
+it is designed for. (??)
+    - there are some batteries (for example) that match more than one
+      camera model -- what to do?
+
+Instructions on web page make it clear that each listing entry is to match
+at most one product.
+    - there are some actual cameras in listings matching no products,
+        - e.g.  fujifilm finepix jv100
+        - e.g. pentax rz10
+        - e.g. olympus stylus tough 3000
+            - oops, this one should match
+            - fixed
+        - e.g. olympus fe-4020
+            - okay, this one should not match
+        - e.g. olympus t-100
+            - oops, this should match the olympus t100
+            - fixed
+        - e.g. Olympus Stylus Tough 3000
+            - oops, this should match the
+              Olympus_Stylus_Tough-3000","manufacturer":"Olympus",
+              "model":"Tough-3000"
+              entry
+            - fixed
+        - e.g. pentax optio rz10
+            - okay, this one should not match
+        - e.g. NIKON D300s (camera body only) + SLRC-201 Bag +
+               16 GB SDHC Memory Card + Battery EN-EL3e
+            - oops, this should match the Nikon_D300S product
+            - fixed
+        - e.g. Sony T Series DSC-T99
+            - oops should match
+            - fixed
+        - e.g. Canon Powershot SD4000
+            - okay
+        - e.g. Olympus-VR320
+            - okay
+        - e.g. Canon A2200IS
+            - okay
+        - e.g. Canon_EOS_Rebel_T1i
+            - okay
+
+- looks like majority of (non-matching) listings are actually cameras,
+  not accessories
+
+Web page also mentions that generic algorithm is to operate, not gigantic
+if statements, so that when they run it against different data that we
+don't see, it should still work.
