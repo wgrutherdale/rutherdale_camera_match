@@ -7,7 +7,7 @@ use autodie;
 use FindBin;
 use lib "FindBin::Bin";
 use matchHeuristics;
-use Test::Simple tests => 16;
+use Test::Simple tests => 22;
 
 MAIN:
 {
@@ -85,6 +85,30 @@ sub testMatching
         {product_name => "Canon_EOS_Rebel_T1i", manufacturer => "Canon", model => "T1i", family => "Rebel", "announced-date" => "2009-03-24T20:00:00.000-04:00"},
         {title => "Canon EOS Rebel T1i 15.1 MP CMOS Digital SLR Camera with 3-Inch LCD and EF-S 18-55mm f/3.5-5.6 IS Lens", manufacturer => "Canon", currency => "CAD", price => 899.00});
     ok($matches10==1, "matches10");
+    my $matches11a = doesMatch( # should not match
+        {product_name => "Canon_IXUS_300_HS", manufacturer => "Canon", model => "300 HS", family => "IXUS","announced-date" => "2010-05-10T20:00:00.000-04:00"},
+        {title => "Canon PowerShot ELPH 300 HS (Black)", manufacturer => "Canon Canada", currency => "CAD", price => 259.99});
+    ok($matches11a==0, "matches11a");
+    my $matches11b = doesMatch( # should match
+        {product_name => "Canon-ELPH-300HS", manufacturer => "Canon", model => "300 HS", family => "ELPH","announced-date" => "2011-02-06T19:00:00.000-05:00"},
+        {title => "Canon PowerShot ELPH 300 HS (Black)", manufacturer => "Canon Canada", currency => "CAD", price => 259.99});
+    ok($matches11b==1, "matches11b");
+    my $matches12a = doesMatch( # should not match
+        {product_name => "Nikon_D3000", manufacturer => "Nikon", model => "D3000","announced-date" => "2009-07-29T20:00:00.000-04:00"},
+        {title => "Nikon EN-EL9a 1080mAh Ultra High Capacity Li-ion Battery Pack for Nikon D40, D40x, D60, D3000, & D5000 Digital SLR Cameras", manufacturer => "Nikon", currency => "CAD", price => 29.75});
+    ok($matches12a==0, "matches12a");
+    my $matches12b = doesMatch( # should not match
+        {product_name => "Nikon_D5000", manufacturer => "Nikon", model => "D5000","announced-date" => "2009-04-13T20:00:00.000-04:00"},
+        {title => "Nikon EN-EL9a 1080mAh Ultra High Capacity Li-ion Battery Pack for Nikon D40, D40x, D60, D3000, & D5000 Digital SLR Cameras", manufacturer => "Nikon", currency => "CAD", price => 29.75});
+    ok($matches12b==0, "matches12b");
+    my $matches13a = doesMatch( # should match
+        {product_name => "Pentax-WG-1-GPS", manufacturer => "Pentax", model => "WG-1 GPS", family => "Optio","announced-date" => "2011-02-06T19:00:00.000-05:00"},
+        {title => "PENTAX Optio WG-1 GPS 14 MP Rugged Waterproof Digital Camera with 5X Optical Zoom, 2.7-inch LCD and GPS Funtionality (Green )", manufacturer => "Pentax Canada", currency => "CAD", price => 387.33});
+    ok($matches13a==1, "matches13a");
+    my $matches13b = doesMatch( # should not match
+        {product_name => "Pentax-WG-1", manufacturer => "Pentax", model => "WG-1", family => "Optio","announced-date" => "2011-02-06T19:00:00.000-05:00"},
+        {title => "PENTAX Optio WG-1 GPS 14 MP Rugged Waterproof Digital Camera with 5X Optical Zoom, 2.7-inch LCD and GPS Funtionality (Green )", manufacturer =>"Pentax Canada", currency => "CAD", price => 387.33});
+    ok($matches13b==0, "matches13b");
 }
 
 

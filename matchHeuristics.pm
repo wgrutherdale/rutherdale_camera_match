@@ -27,55 +27,64 @@ sub doesMatch
 {
     my ( $prod, $lstg ) = @_;
     my $ok = 1;
-    #my $family_ok = 1; # Whether family is ignored in description is kind of fuzzy.
-    #if ( exists($prod->{family}) )
-    #{
-    #    my $pat = "$prod->{family}";
-    #    $family_ok = 0  unless ( $lstg->{title} =~ m/\b$pat\b/ );
-    #    #say "pat 0 ($pat), family_ok==$family_ok";
-    #}
+    my $family_ok = 1; # Whether family is ignored in description is kind of fuzzy.
+    if ( exists($prod->{family}) )
+    {
+        my $pat = "$prod->{family}";
+        $family_ok = 0  unless ( $lstg->{title} =~ m/\b$pat\b/ );
+        #say "pat 0 ($pat), family_ok==$family_ok";
+    }
     if ( exists($prod->{model}) )
     {
-        my $pat = "$prod->{model}";
-        my @pat_list = split(m/[_ -]/, $pat);
-        #say "pat_list==(@pat_list)";
-        if ( @pat_list==1 )
+        if ( $lstg->{title} =~ m/(.*)batter/i and not $1 =~ m/[kc]amera/i ) # review
         {
-            $pat = extendedModelPattern($pat);
-            $ok = 0  unless ( $lstg->{title} =~ m/\b$pat\b/i );
-            #say "pat 3 ($pat):  ok==$ok";
+            $ok = 0;
         }
-        else
+        if ( $ok )
         {
-            #say "Going in:  ok==$ok";
-            foreach my $pt ( @pat_list )
+            my $pat = "$prod->{model}";
+            my @pat_list = split(m/[_ -]/, $pat);
+            #say "pat_list==(@pat_list)";
+            if ( @pat_list==1 )
             {
-                my $p = extendedModelPattern($pt);
-                if ( $p =~ m/\d$/ )
-                {
-                    $ok = 0  unless ( $lstg->{title} =~ m/$p\D/i or $lstg->{title} =~ m/$p$/i );
-                    #say "match a:  ok==$ok";
-                }
-                elsif ( $p =~ m/[[:alpha:]]+$/ )
-                {
-                    $ok = 0  unless ( $lstg->{title} =~ m/\b$p\w*/i );
-                    #say "match b:  ok==$ok";
-                }
-                else
-                {
-                    $ok = 0  unless ( $lstg->{title} =~ m/\b$p\b/i );
-                    #say "match c:  ok==$ok";
-                }
-                #say "p 3 ($p), ok==$ok";
-                #say "title==($lstg->{title})";
+                $pat = extendedModelPattern($pat);
+                $ok = 0  unless ( $lstg->{title} =~ m/\b$pat\b/i );
+                #say "pat 3 ($pat):  ok==$ok";
             }
-            if ( !$ok )
+            else
             {
-                my $pt = join('', @pat_list);
-                $ok = 1  if ( $lstg->{title} =~ m/\b$pt\b/i );
+                say "Going in:  ok==$ok, pat_list==(@pat_list)";
+                foreach my $pt ( @pat_list )
+                {
+                    my $p = extendedModelPattern($pt);
+                    if ( $p =~ m/\d$/ )
+                    {
+                        $ok = 0  unless ( $lstg->{title} =~ m/$p\D/i or $lstg->{title} =~ m/$p$/i );
+                        #say "match a:  ok==$ok";
+                    }
+                    elsif ( $p =~ m/[[:alpha:]]+$/ )
+                    {
+                        $ok = 0  unless ( $lstg->{title} =~ m/\b$p\w*/i );
+                        #say "match b:  ok==$ok";
+                    }
+                    else
+                    {
+                        $ok = 0  unless ( $lstg->{title} =~ m/\b$p\b/i );
+                        #say "match c:  ok==$ok";
+                    }
+                    next  if ( not $ok );
+                    #say "p 3 ($p), ok==$ok";
+                    #say "title==($lstg->{title})";
+                }
+                if ( not $ok )
+                {
+                    my $pt = join('', @pat_list);
+                    $ok = 1  if ( $lstg->{title} =~ m/\b$pt\b/i );
+                }
             }
         }
     }
+    $ok = 0  if ( not $family_ok and exists($prod->{family}) and familyImportant($prod->{manufacturer}) );
     return $ok;
 }
 
@@ -106,5 +115,14 @@ sub allowSuffix
     my ( $manufacturer ) = @_;
     return ($manufacturer =~ m/sony/i) ? 1 : 0;
 }
+
+
+sub familyImportant
+{
+    my ( $manufacturer ) = @_;
+    return ($manufacturer =~ m/canon/i or
+            $manufacturer =~ m/pentax/i) ? 1 : 0;
+}
+
 
 1;
