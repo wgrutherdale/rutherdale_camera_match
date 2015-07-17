@@ -7,6 +7,7 @@ use JSON::PP;
 use Data::Dumper;
 use Getopt::Std;
 use Test::Harness;
+use Time::HiRes qw/gettimeofday/;
 
 use FindBin;
 use lib "FindBin::Bin";
@@ -25,19 +26,68 @@ MAIN:
 {
     my %options = ( p => DATA_PRODUCTS_TEXT, l => DATA_LISTINGS_TEXT,
                     r => RESULTS_TEXT );
-    getopt("tp:l:r:h", \%options);
+    getopt("tnp:l:r:h", \%options);
     if ( exists($options{h}) )
     {
         help();
     }
     elsif ( exists($options{t}) )
     {
-        testMatching();
+        #testParsing();
+        #testMatching();
+        testMatchingRevised();
+    }
+    elsif ( exists($options{n}) )
+    {
+        my $t0 = gettimeofday();
+        my $products = getJsonText($options{p});
+        my $t1 = gettimeofday();
+        printf("Loaded products:  %0.3fs\n", $t1-$t0);
+        $t0 = $t1;
+        my $listings = getJsonText($options{l});
+        $t1 = gettimeofday();
+        printf("Loaded listings:  %0.3fs\n", $t1-$t0);
+        $t0 = $t1;
+        my $prod_struct = prodSystemInit();
+        $t1 = gettimeofday();
+        printf("Initialised product struct:  %0.3fs\n", $t1-$t0);
+        $t0 = $t1;
+        prodSystemMapManufListings( $prod_struct, $products, $listings);
+        $t1 = gettimeofday();
+        printf("Set up manufacturer mappings:  %0.3fs\n", $t1-$t0);
+        $t0 = $t1;
+        my $results = {};
+        foreach my $prod ( @$products )
+        {
+            prodSystemTrackProduct($prod_struct, $prod);
+            $results->{$prod->{product_name}} = [];
+        }
+        $t1 = gettimeofday();
+        printf("Set up all products in structure:  %0.3fs\n", $t1-$t0);
+        $t0 = $t1;
+        my $report_stats = { n_none => 0, n_cam_1 => 0,
+                             n_reason_no_manuf => 0 };
+        prodMatchListings($prod_struct, $listings, $results, $report_stats);
+        $t1 = gettimeofday();
+        printf("Determined product matches for listings:  %0.3fs\n", $t1-$t0);
+        $t0 = $t1;
+        #print Dumper($results);
+        outputJsonResults($results, $options{r});
+        $t1 = gettimeofday();
+        printf("Output Json results:  %0.3fs\n", $t1-$t0);
+        #my $results = {};
+        #matchProductsListings($products, $listings, $results);
+        #outputJsonResults($results, $options{r});
+        say "Report stats:";
+        say "  Number of listings matching nothing:  $report_stats->{n_none}";
+        say "    Due to missing manufacturer:  $report_stats->{n_reason_no_manuf}";
+        say "  Number of listings matching 1 camera:  $report_stats->{n_cam_1}";
     }
     else
     {
         my $products = getJsonText($options{p});
         my $listings = getJsonText($options{l});
+        say "Loaded products and listings.";
         my $results = {};
         matchProductsListings($products, $listings, $results);
         outputJsonResults($results, $options{r});
@@ -50,6 +100,7 @@ sub help
 {
     say STDERR "usage:  match.pl [-t] [-p <prod>] [-l <listing>] [-r <results>] [-h]";
     say STDERR "  where -t indicates to run test";
+    say STDERR "        -n indicates running new algorithm";
     say STDERR "        <prod> is alternative product file, default ", DATA_PRODUCTS_TEXT;
     say STDERR "        <listing> is alternative product file, default ", DATA_LISTINGS_TEXT;
     say STDERR "        <results> is alternative results file, default ", RESULTS_TEXT;
@@ -206,7 +257,7 @@ sub processProdCandidate
             push(@$res_item, $lstg);
         }
     }
-    #say "  camera_prod_ind_list==(@camera_prod_ind_list)";
+    say "  camera_prod_ind_list==(@camera_prod_ind_list)";
     reportListing($products, $lstg, \@camera_prod_ind_list, $report_stats);
 }
 
@@ -238,35 +289,25 @@ sub reportListing
 }
 
 
-# createManufacturerMapping() -- Take list of product manufacturer values, and
-# list of listing manufacturer values.  Figure out which manufacturer names in
-# the listings correspond to which manufacturer names in the products.  Return
-# hash reference giving this mapping:  input listing manufacturer name, get
-# back product manufacturer name.
-# Parameters:
-#   prod_mfg_keys:  list reference of product manufacturer fields
-#   lstg_mfg_keys:  list reference of listing manufacturer fields
-#
-# Explanation:
-# Product records will have manufacturer names like "Canon" or "Nikon".
-# Listing records will have manufacturer names like "Canon Canada" or
-# "Nikon PLC".
-# This function applies simple string indexing rule to match them, and keeps
-# results in map.
-sub createManufacturerMapping
+sub testParsing
 {
-    my ($prod_mfg_keys, $lstg_mfg_keys) = @_;
-    my %mapping;
-    foreach my $lstg ( @$lstg_mfg_keys )
-    {
-        my $prod_name = $lstg;
-        foreach my $prod ( @$prod_mfg_keys )
-        {
-            $prod_name = $prod  if ( index($lstg, $prod)>=0 );
-        }
-        $mapping{$lstg} = $prod_name;
-    }
-    return \%mapping;
+    say "testParsing()";
+    testParseA("Nikon_D300", 0, "Nikon D3000 10.2MP Digital SLR Camera Kit (Body) with WSP Mini Tripod & Cleaning set.");
+    testParseA("Nikon_D300", 1, "Nikon D3000 10.2MP Digital SLR Camera Kit (Body) with WSP Mini Tripod & Cleaning set.");
+    testParseA("Nikon-D300", 0, "Nikon D300 DX 12.3MP Digital SLR Camera with 18-135mm AF-S DX f/3.5-5.6G ED-IF Nikkor Zoom Lens");
+    testParseA("Nikon:D300", 0, "Nikon D300 DX 12.3MP Digital SLR Camera with 18-135mm AF-S DX f/3.5-5.6G ED-IF Nikkor Zoom Lens");
+    testParseA("Nikon D300", 1, "Nikon D300s 12.3mp Digital SLR Camera with 3inch LCD Display (Includes Manufacturer's Supplied Accessories) with Nikon Af-s Vr Zoom-nikkor 70-300mm F/4.5-5.6g If-ed Lens + PRO Shooter Package Including Dedicated I-ttl Digital Flash + OFF Camera Flash Shoe Cord + 16gb Sdhc Memory Card + Wide Angle Lens + Telephoto Lens + Filter Kit + 2x Extended Life Batteries + Ac-dc Rapid Charger + Soft Carrying Case + Tripod & Much More !!");
+    testParseA("Nikon D300", 0, "Nikon D300s 12.3mp Digital SLR Camera with 3inch LCD Display (Includes Manufacturer's Supplied Accessories) with Nikon Af-s Vr Zoom-nikkor 70-300mm F/4.5-5.6g If-ed Lens + PRO Shooter Package Including Dedicated I-ttl Digital Flash + OFF Camera Flash Shoe Cord + 16gb Sdhc Memory Card + Wide Angle Lens + Telephoto Lens + Filter Kit + 2x Extended Life Batteries + Ac-dc Rapid Charger + Soft Carrying Case + Tripod & Much More !!");
+}
+
+
+sub testParseA
+{
+    my ( $field, $allow_letter_suffix, $str ) = @_;
+    say "  testParseA($field, $allow_letter_suffix)";
+    my $pe = parseExpressionFromProdField($field, $allow_letter_suffix);
+    my $matches = applyParseExpression($pe, $str);
+    say "    pe==($pe), matches==$matches";
 }
 
 
@@ -275,6 +316,35 @@ sub createManufacturerMapping
 sub testMatching
 {
     runtests("testMatchHeuristics.t");
+}
+
+
+# testMatchingRevised()
+# Apply various test cases to determine how well doesMatch() performs.
+sub testMatchingRevised
+{
+    runtests("testMatchHeuristics.t");
+}
+
+
+sub prodMatchListings
+{
+    my ( $prod_struct, $listings, $results, $report_stats ) = @_;
+    foreach my $list ( @$listings )
+    {
+        my ( $prod, $no_manuf ) = prodSystemListingBestMatch($prod_struct, $list);
+        if ( defined($prod) )
+        {
+            my $res_item = $results->{$prod->{product_name}};
+            push(@$res_item, $list);
+            ++$report_stats->{n_cam_1};
+        }
+        else
+        {
+            ++$report_stats->{n_none};
+            ++$report_stats->{n_reason_no_manuf}  if ( $no_manuf );
+        }
+    }
 }
 
 
