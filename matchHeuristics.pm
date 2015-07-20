@@ -9,126 +9,10 @@ use Data::Dumper;
 
 use Exporter;
 our @ISA = ("Exporter");
-our @EXPORT = qw(&extendedModelPattern &allowSuffix &doesMatch &createManufacturerMapping
-                 &prodSystemInit &prodSystemTrackProduct &prodSystemMapManufListings
+our @EXPORT = qw(&prodSystemInit &prodSystemTrackProduct &prodSystemMapManufListings
+                 &prodSystemTrackProductList
                  &prodSystemListingBestMatch &parseExpressionFromProdField
-                 &applyParseExpression);
-
-#use constant PROD_TYPE_CAMERA => 0;
-#use constant PROD_TYPE_ACCESSORY => 1;
-#use constant PROD_TYPE_UNKNOWN => 2;
-#use constant TEST_MODE => 0;
-
-#use constant DATA_PRODUCTS_TEXT => "data/products.txt";
-#use constant DATA_LISTINGS_TEXT => "data/listings.txt";
-#use constant RESULTS_TEXT => "results.txt";
-
-# doesMatch() -- Apply heuristics to determine whether given listing entry
-# matches given product entry.
-# Precondition:  match on manufacturer has already been confirmed.
-sub doesMatch
-{
-    my ( $prod, $lstg ) = @_;
-    my $ok = 1;
-    my $family_ok = 1; # Whether family is ignored in description is kind of fuzzy.
-    if ( exists($prod->{family}) )
-    {
-        my $pat = "$prod->{family}";
-        $family_ok = 0  unless ( $lstg->{title} =~ m/\b$pat\b/ );
-        #say "pat 0 ($pat), family_ok==$family_ok";
-    }
-    if ( exists($prod->{model}) )
-    {
-        if ( $lstg->{title} =~ m/(.*)batter/i and not $1 =~ m/[kc]amera/i ) # review
-        {
-            $ok = 0;
-        }
-        if ( $ok )
-        {
-            my $pat = "$prod->{model}";
-            my @pat_list = split(m/[_ -]/, $pat);
-            #say "pat_list==(@pat_list)";
-            if ( @pat_list==1 )
-            {
-                $pat = extendedModelPattern($pat);
-                $ok = 0  unless ( $lstg->{title} =~ m/\b$pat\b/i );
-                #say "pat 3 ($pat):  ok==$ok";
-            }
-            else
-            {
-                say "Going in:  ok==$ok, pat_list==(@pat_list)";
-                foreach my $pt ( @pat_list )
-                {
-                    my $p = extendedModelPattern($pt);
-                    if ( $p =~ m/\d$/ )
-                    {
-                        $ok = 0  unless ( $lstg->{title} =~ m/$p\D/i or $lstg->{title} =~ m/$p$/i );
-                        #say "match a:  ok==$ok";
-                    }
-                    elsif ( $p =~ m/[[:alpha:]]+$/ )
-                    {
-                        $ok = 0  unless ( $lstg->{title} =~ m/\b$p\w*/i );
-                        #say "match b:  ok==$ok";
-                    }
-                    else
-                    {
-                        $ok = 0  unless ( $lstg->{title} =~ m/\b$p\b/i );
-                        #say "match c:  ok==$ok";
-                    }
-                    next  if ( not $ok );
-                    #say "p 3 ($p), ok==$ok";
-                    #say "title==($lstg->{title})";
-                }
-                if ( not $ok )
-                {
-                    my $pt = join('', @pat_list);
-                    $ok = 1  if ( $lstg->{title} =~ m/\b$pt\b/i );
-                }
-            }
-        }
-    }
-    $ok = 0  if ( not $family_ok and exists($prod->{family}) and familyImportant($prod->{manufacturer}) );
-    return $ok;
-}
-
-
-# extendedModelPattern() -- Utility to expand camera model string to one that
-# matches a suffix context.
-sub extendedModelPattern
-{
-    my ( $pat ) = @_;
-    if ( $pat =~ m/^(.*)([[:alpha:]])[- _]*(\d)(.*)/ )
-    {
-        $pat = $1 . $2 . "[- _]*" . $3 . $4;
-    }
-    return $pat;
-}
-
-
-# allowSuffix():  Determine answer to following question for given
-# manufacturer.
-# Question:
-# Should suffix be allowed as same model?
-# For some manufacturers, the answer is yes.  For example, the Sony DSC-T99/B
-# or DSC-T99B appears to be just a later minor edition of the T99, whereas
-# for Nikon you get a D300S, which is definitely a different camera model
-# from the D300.
-
-# Examples:
-# Against these products:
-#   { product_name => "Nikon_D300", manufacturer => "Nikon", model => "D300", "announced-date" => "2009-07-29T20:00:00.000-04:00"},
-#
-# Match these listings and pick the best fit for each:
-#   { title => "Nikon D300 DX 12.3MP Digital SLR Camera with 18-135mm AF-S DX f/3.5-5.6G ED-IF Nikkor Zoom Lens", manufacturer => "Nikon", currency => "USD", price => 2899.98});
-#   { title => "Nikon D3000 10.2MP Digital SLR Camera Kit (Body) with WSP Mini Tripod & Cleaning set.", manufacturer => "Nikon", currency => "USD", price => 499.95});
-#   { title => "Nikon D300s 12.3mp Digital SLR Camera with 3inch LCD Display (Includes Manufacturer's Supplied Accessories) with Nikon Af-s Vr Zoom-nikkor 70-300mm F/4.5-5.6g If-ed Lens + PRO Shooter Package Including Dedicated I-ttl Digital Flash + OFF Camera Flash Shoe Cord + 16gb Sdhc Memory Card + Wide Angle Lens + Telephoto Lens + Filter Kit + 2x Extended Life Batteries + Ac-dc Rapid Charger + Soft Carrying Case + Tripod & Much More !!", manufacturer => "Digital", currency => "USD", price => 2094.99});
-
-sub allowSuffix
-{
-    my ( $manufacturer ) = @_;
-    return ($manufacturer =~ m/sony/i) ? 1 : 0;
-}
-
+                 applyParseRE);
 
 # createManufacturerMapping() -- Take list of product manufacturer values, and
 # list of listing manufacturer values.  Figure out which manufacturer names in
@@ -182,36 +66,6 @@ sub createManufacturerMapping
 }
 
 
-sub createManufacturerMapping_Orig
-{
-    my ($prod_mfg_keys, $lstg_mfg_keys) = @_;
-    my %mapping;
-    foreach my $lstg ( @$lstg_mfg_keys )
-    {
-        my $prod_name = $lstg;
-        foreach my $prod ( @$prod_mfg_keys )
-        {
-            #$prod_name = $prod  if ( index($lstg, $prod)>=0 );
-            if ( $lstg =~ m/^$prod/i )
-            {
-                $prod_name = $prod;
-                next;
-            }
-        }
-        $mapping{$lstg} = $prod_name;
-    }
-    return \%mapping;
-}
-
-
-sub familyImportant
-{
-    my ( $manufacturer ) = @_;
-    return ($manufacturer =~ m/canon/i or
-            $manufacturer =~ m/pentax/i) ? 1 : 0;
-}
-
-
 sub prodSystemInit
 {
     my $prod_struct = { manuf_division => {} };
@@ -249,6 +103,7 @@ sub prodSystemTrackProduct
         my $family_pe = parseExpressionFromProdField($prod->{family}, 0);
         $prod->{family_pe} = $family_pe;
         $prod->{family_re} = qr/$family_pe/i;
+        #say "added family_re for ($prod->{family})";
     }
     if ( exists($manuf_division->{$manuf}) )
     {
@@ -262,31 +117,92 @@ sub prodSystemTrackProduct
 }
 
 
+sub prodSystemTrackProductList
+{
+    my ($prod_struct, $prod_list) = @_;
+    my %prod_name_used;
+    foreach my $prod ( @$prod_list )
+    {
+        prodSystemTrackProduct($prod_struct, $prod);
+        if ( exists($prod_name_used{$prod->{product_name}}) )
+        {
+            die "Duplicate product name $prod->{product_name}";
+        }
+        $prod_name_used{$prod->{product_name}} = 1;
+    }
+}
+
+
 sub prodSystemListingBestMatch
 {
     my ( $prod_struct, $listing ) = @_;
     #print Dumper($prod_struct);
-    my ( $prod_ind, $match_strength ) = ( -1, 0 );
+    my $match_strength = 0;
     my $manuf = $listing->{manufacturer};
-    #say "no manuf a"  unless ( defined($manuf) );
     my $manuf_map = $prod_struct->{manuf_map};
-    my $old_manuf = $manuf;
     $manuf = $manuf_map->{$manuf}; # map to product manuf name
-    #say "no manuf b"  unless ( defined($manuf) );
-    #say "using manuf==($manuf) from ($old_manuf)";
-    my $product_list = $prod_struct->{manuf_division}{$manuf};
-    if ( defined($manuf) and defined($product_list) )
-    {
-        for ( my $i = 0;  $i<@$product_list;  ++$i )
-        {
-            my $strength = matchListingProduct($listing, $product_list->[$i] );
-            #say "trying product $i:  strength==$strength";
-            ($prod_ind, $match_strength ) = ( $i, $strength )  if ( $strength>$match_strength );
-        }
-    }
     my $prod = undef;
-    $prod = $product_list->[$prod_ind]  if ( $prod_ind>=0 );
+    if ( defined($manuf) )
+    {
+        my $product_list = $prod_struct->{manuf_division}{$manuf};
+        #my $smat = 0;
+        my @prod_ind_list;
+        if ( defined($manuf) and defined($product_list) )
+        {
+            for ( my $i = 0;  $i<@$product_list;  ++$i )
+            {
+                my $strength = matchListingProduct($listing, $product_list->[$i] );
+                #say "trying product $i:  strength==$strength";
+                if ( $strength>$match_strength )
+                {
+                    $match_strength = $strength;
+                    #push(@prod_ind_list, $i);
+                    #++$smat;
+                    @prod_ind_list = ( $i ); # clear out old list of lower strength
+                    #say "pushing (first) $i ($product_list->[$i]{product_name}) with strength $strength";
+                }
+                elsif ( $strength>0 and $strength==$match_strength )
+                {
+                    #say "strength matches";
+                    #++$smat;
+                    push(@prod_ind_list, $i);
+                    #say "pushing $i ($product_list->[$i]{product_name}) with strength $strength";
+                }
+            }
+        }
+        #say "smat==$smat";
+        #my $prod = undef;
+        #$prod = $product_list->[$prod_ind]  if ( $prod_ind>=0 );
+        $prod = getBestProd($product_list, \@prod_ind_list);
+    }
     return ( $prod, (not defined($manuf)) );
+}
+
+
+use constant MAX_PRODUCT_COMPLEXITY => 999_999_999;
+
+sub getBestProd
+{
+    my ($product_list, $prod_ind_list) = @_;
+    my ( $prod, $max_prod_complexity, $min_prod_complexity ) = ( undef, 0, MAX_PRODUCT_COMPLEXITY );
+    foreach my $i ( @$prod_ind_list )
+    {
+        #say "getBestProd() $i";
+        my $p = $product_list->[$i];
+        my $comp = productComplexity($p);
+        #( $prod, $min_prod_complexity ) = ( $p, $comp )  if ( $comp<$min_prod_complexity );
+        ( $prod, $max_prod_complexity ) = ( $p, $comp )  if ( $comp>$max_prod_complexity );
+    }
+    return $prod;
+}
+
+
+sub productComplexity
+{
+    my ( $prod ) = @_;
+    my $comp = 1000*length($prod->{model});
+    $comp += length($prod->{family})  if ( exists($prod->{family}) );
+    return $comp;
 }
 
 
@@ -296,26 +212,17 @@ sub matchListingProduct
 {
     my ($listing, $product ) = @_;
     my $stren = 0;
-    #my $model_pe = parseExpressionFromProdField($product->{model}, 0);
-    my $manuf = $product->{manufacturer};
-    #my $model_pe = parseExpressionFromProdField($product->{model},
-    #        allowSuffix($manuf));
-    #my $model_pe = parseExpressionFromProdField($product->{model}, 0);
-    #say "trying parse expr for model ($model_pe) and title ($listing->{title})";
-    #my $model_match_len = applyParseExpression($product->{model_pe}, $listing->{title});
     my $model_match_len = applyParseRE($product->{model_re}, $listing->{title});
     my $family_match_len = 0;
-    # TODO  Possibly call familyImportant() here;  tweaking issue
     if ( $model_match_len>0 && exists($product->{family_re}) )
     {
-        #my $family_pe = parseExpressionFromProdField($product->{family}, 0);
-        #my $family_pe = parseExpressionFromProdField($product->{family}, 0);
-        #my $family_pe = parseExpressionFromProdField($product->{family},
-        #        allowSuffix($manuf));
-        #$family_match_len = applyParseExpression($product->{family_pe}, $listing->{title});
         $family_match_len = applyParseRE($product->{family_re}, $listing->{title});
     }
+    #say "model==($product->{model}), model_pe==($product->{model_pe})"  if ( exists($product->{model}) );
+    #say "model_match_len==$model_match_len, family_match_len==$family_match_len, title==($listing->{title})";
+    #say "family==($product->{family}), family_pe==($product->{family_pe})"  if ( exists($product->{family}) );
     $stren = computeMatchStrength($model_match_len, $family_match_len);
+    #say "  stren==$stren";
     return $stren;
 }
 
@@ -372,6 +279,7 @@ sub parseExpressionFromProdField
     #$pe = join("[_ -:]+", @mod_field_list);
     #$pe = join("\\[_ -:\\]+", @mod_field_list);
     #$pe = join("\\[_ -\\]+", @mod_field_list);
+    #say "mod_field_list==(@mod_field_list)";
     for ( my $i = 0;  $i<@mod_field_list;  ++$i )
     {
         my $f = $mod_field_list[$i];
@@ -379,35 +287,47 @@ sub parseExpressionFromProdField
         {
             #$f = "([_ -:]+$f)?";
             #$f = "([_ -:]*$f)?";
-            $f = "([_ -:]*$f)";
+            if ( $f =~ m/^\d+$/ )
+            {
+                $f = "([_ -:]*(?<!\\d)$f(?!\\d))";
+            }
+            else
+            {
+                $f = "([_ -:]*$f)";
+            }
+        }
+        elsif ( $i==0 and @mod_field_list>1 )
+        {
+            if ( $f =~ m/^\d+$/ )
+            {
+                $f = "((?<!\\d)$f(?!\\d))?";
+            }
+            else
+            {
+                $f = "($f)?";
+            }
         }
         $pe .= $f;
     }
     return $pe;
 }
-
-
-# applyParseExpression() -- Apply parse expression from
-# parseExpressionFromProdField(), to string.  Return 0 if nothing matched,
-# or length of match if it did match.
-sub applyParseExpression
-{
-    my ( $pe, $str ) = @_;
-    my $len = 0;
-    $len = length($&)  if ( $str =~ m/$pe/i);
-    return $len;
-}
-
-
+# applyParseRE() -- Apply parse regex from parseExpressionFromProdField(),
+# to string.  Return 0 if nothing matched, or length of match if it did match.
 sub applyParseRE
 {
     my ( $re, $str ) = @_;
     my $len = 0;
-    $len = length($&)  if ( $str =~ $re);
+    if ( $str =~ $re)
+    {
+        $len = length($&);
+        #say "    match is ($&)";
+    }
     return $len;
 }
 
 
+# computeMatchStrength() -- Compute strength of match result.
+# This is a basic heuristic against which matches are compared.
 sub computeMatchStrength
 {
     my ( $model_len, $family_len ) = @_;

@@ -58,3 +58,151 @@ at most one product.
 Web page also mentions that generic algorithm is to operate, not gigantic
 if statements, so that when they run it against different data that we
 don't see, it should still work.
+
+
+Design
+======
+
+
+Arrangement of Program
+~~~~~~~~~~~~~~~~~~~~~~
+
+The program is written in Perl, so as to take advantage of pattern-matching
+capabilities and dynamic data structures, and to make rapid prototyping and
+modification easy.  It uses the JSON::PP library for conversion of data
+between json format and Perl dynamic structures (nested hashes and lists).
+
+The program accepts command-line options using getopt.  This allows the input
+and output file names to be modified from the default.  A -h option shows all
+the options.
+
+The Test::Simple library is used for creating automated test cases.  This
+facilitates use of a test-driven development approach so that new algorithms
+can be verified against basic test examples.  Doing this iteratively is
+critical to improving the accuracy of the program.
+
+The program initially reads all the data from the products and listings files
+into data structures consisting of big lists of each.  The program then builds
+a product structure with a re-organised representation of products allowing
+rapid matching of listing entries against the whole product set.
+
+The listings are then processed in sequence, finding a best match product for
+each, building a results data structure that contains all the matched listings
+for each product.  These results are then output to a file (default name
+results.txt) containing the json data.
+
+
+Basic Matching Strategy
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The first-order problem is matching a listing against products by
+manufacturer.  Accordingly, in the preprocessing stage, a mapping is built
+from all possible manufacturer names in the listings to the corresponding
+manufacturer name in the products.
+
+This mapping is needed because of the following examples:
+
+Listings:
+{"title":"Canon PowerShot ELPH 300 HS (Black)","manufacturer":"Canon Canada","currency":"CAD","price":"259.99"}
+{"title":"Canon PowerShot ELPH 300 HS 12 MP CMOS Digital Camera with Full 1080p HD Video (Black)",
+ "manufacturer":"Canon","currency":"USD","price":"249.99"}
+
+Products:
+{"product_name":"Canon-ELPH-300HS","manufacturer":"Canon","model":"300 HS","family":"ELPH",
+ "announced-date":"2011-02-06T19:00:00.000-05:00"}
+
+The preprocessing stage also creates a hierarchical structure with
+manufacturer at the top level and a list of products for that manufacturer
+below.
+
+This allows rapid separation by manufacturer so that during the processing
+stage a given listing can be mapped immediately to the list of products for
+the manufacturer it belongs to.
+
+Processing then takes this list of candidate products for the listing, and
+tries to find the best match on each.
+
+Part of the problem is that hyphenation can differ between listing and product
+description.  Example:
+
+Product:
+{ product_name => "Canon_PowerShot_SD980_IS", manufacturer => "Canon", model => "SD980 IS",
+  family => "PowerShot","announced-date" => "2009-08-18T20:00:00.000-04:00" },
+
+Listing:
+{ title => "Canon PowerShot SD980IS 12MP Digital Camera with 5x Ultra Wide Angle Optical Image Stabilized Zoom and 3-inch LCD (Purple)",
+  manufacturer => "Canon", currency => "USD", price => 157.95 },
+
+Thus there is a low-level requirement of handling punctuation so that a field
+from the product such as "SD980 IS" can match a title containing "SD980IS" or
+"SD-980-IS" or "SD_980 IS" arbitrarily.  This is to be expected, because
+retailers may type rapidly and describe the products a little differently than
+the manufacturer.
+
+The next problem is which fields in the products to match against which fields
+in the listings.  The program takes the approach of matching the following
+product fields against the listing "title" field:
+    - (manufacturer has already been matched)
+    - model
+    - family, if present
+
+This program constructs a suitable regular expression containing all the
+elements of the given field (model or family), and allowing optional
+separators.
+
+So to match the given listing, a list of candidate products is produced.
+
+The next problem is higher level.  For example, consider listing titles:
+"Nikon D300S Digital SLR Camera (Body Only)"
+"Nikon D3000 Digital SLR Camera (Body Only)"
+"Nikon D300 Digital SLR Camera (Body Only)"
+
+against the following product models: "D300", "D300S", "D3000", "D3".
+
+A strength function is computed on each candidate match.  The list of
+candidate products is created with greatest matching strength.
+
+Then you still get a problem that there might be more than one with the same
+matching strength, so you have to pick the one product with the best fit.  The
+program runs both stages:  getting a list of candidates with highest matching
+strength, then picking best-fit product on the resulting list.
+
+
+Performance Issues
+~~~~~~~~~~~~~~~~~~
+
+Two areas of processing were found to take a long time:
+(a)  Building the manufacturer map
+(b)  Matching candidate products against listing titles
+
+Timing showed that (a) and (b) each took approximately 30 seconds on a PC.
+By using improved algorithms, they were each reduced to about 1 second.
+
+(a)  Manufacturer map.  The simple solution involved creating a nested loop:
+    for each listing
+        for each product
+            construct regex for product manufacturer and match listing
+            against it
+            test for match against product
+This is quadratic, O(m*n), where m is number of listings and n is number of
+products.
+
+To reduce the runtime, observe that a trie solution might make it faster.  But
+rather than hand-construct a trie in Perl, a better solution was found:  use
+the existing regex facilities.
+
+It is possible to build a big regex like (Nikon)|(Canon)|(Olympus) with all
+the manufacturers from products.  Then compiling this regex using the Perl
+qr// operator generates an efficient structure for lookup.  Perl has a messy
+but usable way to find the number of the brace expression that was matched.
+This then yields the index of the manufacturer.
+
+Thus one big regex could be constructed one time at the beginning and used
+for efficient indexing while looping through listings.
+
+(b)  Matching product fields against listings
+
+Again, a problem was repeated construction of the same regex expressions during
+runtime.  The simple solution was to compute all the regex expressions during
+preprocessing and store them with each product in the product struct, after
+applying the qr// operator to pre-compile each regex.
