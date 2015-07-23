@@ -101,26 +101,23 @@ sub outputJsonResults
 sub matchItems
 {
     my ( $options ) = @_;
+
     my $t0 = gettimeofday();
     my $products = getJsonText($options->{p});
     $t0 = reportAndGetTime("Loaded products", $t0);
     my $listings = getJsonText($options->{l});
     $t0 = reportAndGetTime("Loaded listings", $t0);
-    my $prod_struct = prodSystemInit();
+    my $match_heuristics = matchHeuristics->new();
+
     $t0 = reportAndGetTime("Initialised product struct", $t0);
-    prodSystemMapManufListings( $prod_struct, $products, $listings);
+    $match_heuristics->prodSystemMapManufListings( $products, $listings);
     $t0 = reportAndGetTime("Set up manufacturer mappings", $t0);
     my $results = {};
-    prodSystemTrackProductList($prod_struct, $products);
-    foreach my $prod ( @$products )
-    {
-        #prodSystemTrackProduct($prod_struct, $prod);
-        $results->{$prod->{product_name}} = [];
-    }
+    $match_heuristics->prodSystemTrackProductList($products, $results);
     $t0 = reportAndGetTime("Set up all products in structure", $t0);
     my $report_stats = { n_none => 0, n_cam_1 => 0,
                          n_reason_no_manuf => 0 };
-    prodMatchListings($prod_struct, $listings, $results, $report_stats);
+    prodMatchListings($match_heuristics, $listings, $results, $report_stats);
     $t0 = reportAndGetTime("Determined product matches for listings", $t0);
     #print Dumper($results);
     outputJsonResults($results, $options->{r});
@@ -147,30 +144,32 @@ sub matchItems
 sub testParsing
 {
     say "testParsing()";
-    testParseA("Nikon_D300", 0, "Nikon D3000 10.2MP Digital SLR Camera Kit (Body) with WSP Mini Tripod & Cleaning set.");
-    testParseA("Nikon_D300", 1, "Nikon D3000 10.2MP Digital SLR Camera Kit (Body) with WSP Mini Tripod & Cleaning set.");
-    testParseA("Nikon-D300", 0, "Nikon D300 DX 12.3MP Digital SLR Camera with 18-135mm AF-S DX f/3.5-5.6G ED-IF Nikkor Zoom Lens");
-    testParseA("Nikon:D300", 0, "Nikon D300 DX 12.3MP Digital SLR Camera with 18-135mm AF-S DX f/3.5-5.6G ED-IF Nikkor Zoom Lens");
-    testParseA("Nikon D300", 1, "Nikon D300s 12.3mp Digital SLR Camera with 3inch LCD Display (Includes Manufacturer's Supplied Accessories) with Nikon Af-s Vr Zoom-nikkor 70-300mm F/4.5-5.6g If-ed Lens + PRO Shooter Package Including Dedicated I-ttl Digital Flash + OFF Camera Flash Shoe Cord + 16gb Sdhc Memory Card + Wide Angle Lens + Telephoto Lens + Filter Kit + 2x Extended Life Batteries + Ac-dc Rapid Charger + Soft Carrying Case + Tripod & Much More !!");
-    testParseA("Nikon D300", 0, "Nikon D300s 12.3mp Digital SLR Camera with 3inch LCD Display (Includes Manufacturer's Supplied Accessories) with Nikon Af-s Vr Zoom-nikkor 70-300mm F/4.5-5.6g If-ed Lens + PRO Shooter Package Including Dedicated I-ttl Digital Flash + OFF Camera Flash Shoe Cord + 16gb Sdhc Memory Card + Wide Angle Lens + Telephoto Lens + Filter Kit + 2x Extended Life Batteries + Ac-dc Rapid Charger + Soft Carrying Case + Tripod & Much More !!");
+    testParseA("Nikon_D300", "Nikon D3000 10.2MP Digital SLR Camera Kit (Body) with WSP Mini Tripod & Cleaning set.");
+    testParseA("Nikon_D300", "Nikon D3000 10.2MP Digital SLR Camera Kit (Body) with WSP Mini Tripod & Cleaning set.");
+    testParseA("Nikon-D300", "Nikon D300 DX 12.3MP Digital SLR Camera with 18-135mm AF-S DX f/3.5-5.6G ED-IF Nikkor Zoom Lens");
+    testParseA("Nikon:D300", "Nikon D300 DX 12.3MP Digital SLR Camera with 18-135mm AF-S DX f/3.5-5.6G ED-IF Nikkor Zoom Lens");
+    testParseA("Nikon D300", "Nikon D300s 12.3mp Digital SLR Camera with 3inch LCD Display (Includes Manufacturer's Supplied Accessories) with Nikon Af-s Vr Zoom-nikkor 70-300mm F/4.5-5.6g If-ed Lens + PRO Shooter Package Including Dedicated I-ttl Digital Flash + OFF Camera Flash Shoe Cord + 16gb Sdhc Memory Card + Wide Angle Lens + Telephoto Lens + Filter Kit + 2x Extended Life Batteries + Ac-dc Rapid Charger + Soft Carrying Case + Tripod & Much More !!");
+    testParseA("Nikon D300", "Nikon D300s 12.3mp Digital SLR Camera with 3inch LCD Display (Includes Manufacturer's Supplied Accessories) with Nikon Af-s Vr Zoom-nikkor 70-300mm F/4.5-5.6g If-ed Lens + PRO Shooter Package Including Dedicated I-ttl Digital Flash + OFF Camera Flash Shoe Cord + 16gb Sdhc Memory Card + Wide Angle Lens + Telephoto Lens + Filter Kit + 2x Extended Life Batteries + Ac-dc Rapid Charger + Soft Carrying Case + Tripod & Much More !!");
 
-    testParseA("Tough-3000", 0, "Olympus T-100 12MP Digital Camera with 3x Optical Zoom and 2.4 inch LCD (Red)");
-    testParseA("T100", 0, "Olympus T-100 12MP Digital Camera with 3x Optical Zoom and 2.4 inch LCD (Red)");
+    testParseA("Tough-3000", "Olympus T-100 12MP Digital Camera with 3x Optical Zoom and 2.4 inch LCD (Red)");
+    testParseA("T100", "Olympus T-100 12MP Digital Camera with 3x Optical Zoom and 2.4 inch LCD (Red)");
 
-    testParseA("DMC-FZ40", 0, "Panasonic Lumix FZ40 Black 24x Zoom Leica Lens Taxes Included!");
-    testParseA("DMC-FZ40", 0, "Panasonic Lumix DMC FZ40 Black 24x Zoom Leica Lens Taxes Included!");
+    testParseA("DMC-FZ40", "Panasonic Lumix FZ40 Black 24x Zoom Leica Lens Taxes Included!");
+    testParseA("DMC-FZ40", "Panasonic Lumix DMC FZ40 Black 24x Zoom Leica Lens Taxes Included!");
 
-    testParseA("PEN E-PL2", 0, "Olympus PEN E-PL1 12.3MP Live MOS Micro Four Thirds Interchangeable Lens Digital Camera with 14-42mm f/3.5-5.6 Zuiko Digital Zoom Lens (Black)");
-    testParseA("PEN E-PL1", 0, "Olympus PEN E-PL1 12.3MP Live MOS Micro Four Thirds Interchangeable Lens Digital Camera with 14-42mm f/3.5-5.6 Zuiko Digital Zoom Lens (Black)");
+    testParseA("PEN E-PL2", "Olympus PEN E-PL1 12.3MP Live MOS Micro Four Thirds Interchangeable Lens Digital Camera with 14-42mm f/3.5-5.6 Zuiko Digital Zoom Lens (Black)");
+    testParseA("PEN E-PL1", "Olympus PEN E-PL1 12.3MP Live MOS Micro Four Thirds Interchangeable Lens Digital Camera with 14-42mm f/3.5-5.6 Zuiko Digital Zoom Lens (Black)");
+
+    testParseA("D1", "Nikon Coolpix P80 10.1MP Digital Camera with 18x Wide Angle Optical Vibration Reduction Zoom (Black)");
 }
 
 
 # testParseA() -- Support routine for testParsing().
 sub testParseA
 {
-    my ( $field, $allow_letter_suffix, $str ) = @_;
-    say "  testParseA($field, $allow_letter_suffix)";
-    my $pe = parseExpressionFromProdField($field, $allow_letter_suffix);
+    my ( $field, $str ) = @_;
+    say "  testParseA($field)";
+    my $pe = parseExpressionFromProdField($field, 0);
     my $re = qr/$pe/i;
     my $matches = applyParseRE($re, $str);
     say "    pe==($pe), matches==$matches";
@@ -209,10 +208,11 @@ sub testMatchingRevised
 #     the listing was used (added to $results) or 0 if not.
 sub prodMatchListings
 {
-    my ( $prod_struct, $listings, $results, $report_stats ) = @_;
+    my ( $match_heuristics, $listings, $results, $report_stats ) = @_;
     foreach my $list ( @$listings )
     {
-        my ( $prod, $no_manuf ) = prodSystemListingBestMatch($prod_struct, $list);
+        #say "working on $list->{title}";
+        my ( $prod, $no_manuf ) = $match_heuristics->prodSystemListingBestMatch($list);
         if ( defined($prod) )
         {
             my $res_item = $results->{$prod->{product_name}};

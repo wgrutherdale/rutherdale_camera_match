@@ -7,8 +7,8 @@ use autodie;
 use FindBin;
 use lib "FindBin::Bin";
 use matchHeuristics;
-#use Test::Simple tests => 22;
-use Test::Simple tests => 27;
+use Test::Simple tests => 28;
+#use Test::Simple tests => 1;
 
 MAIN:
 {
@@ -49,144 +49,140 @@ sub testMatching
         { manufacturer => "Olympus" },
         { manufacturer => "Pentax Canada" },
     ];
-    my $prod_struct = prodSystemInit();
-    prodSystemMapManufListings( $prod_struct, $products, $listings);
+    my $match_heuristics = matchHeuristics->new();
+    $match_heuristics->prodSystemMapManufListings($products, $listings);
     say "done map";
-    foreach my $prod ( @$products )
-    {
-        prodSystemTrackProduct($prod_struct, $prod);
-    }
+    $match_heuristics->prodSystemTrackProductList($products, undef);
     say "done product tracking";
 
-    my $matches0 = testMatchRev($prod_struct,
+    my $matches0 = testMatchRev($match_heuristics,
         { title => "Canon PowerShot SD980IS 12MP Digital Camera with 5x Ultra Wide Angle Optical Image Stabilized Zoom and 3-inch LCD (Purple)", manufacturer => "Canon", currency => "USD", price => 157.95 },
         "Canon_PowerShot_SD980_IS");
     ok($matches0==1, "matches0");
 
-    my $matches1 = testMatchRev($prod_struct,
+    my $matches1 = testMatchRev($match_heuristics,
         { title => "Nikon D300 DX 12.3MP Digital SLR Camera with 18-135mm AF-S DX f/3.5-5.6G ED-IF Nikkor Zoom Lens", manufacturer => "Nikon", currency => "USD", price => 2899.98},
         "Nikon_D300");
     ok($matches1==1, "matches1");
 
-    my $matches2 = testMatchRev($prod_struct,
+    my $matches2 = testMatchRev($match_heuristics,
         { title => "Nikon D3000 10.2MP Digital SLR Camera Kit (Body) with WSP Mini Tripod & Cleaning set.",
           manufacturer => "Nikon", currency => "USD", price => 499.95},
           "Nikon_D3000");
     ok($matches2==1, "matches2");
 
-    my $matches3 = testMatchRev($prod_struct,
+    my $matches3 = testMatchRev($match_heuristics,
         { title => "Nikon D300s 12.3mp Digital SLR Camera with 3inch LCD Display (Includes Manufacturer's Supplied Accessories) with Nikon Af-s Vr Zoom-nikkor 70-300mm F/4.5-5.6g If-ed Lens + PRO Shooter Package Including Dedicated I-ttl Digital Flash + OFF Camera Flash Shoe Cord + 16gb Sdhc Memory Card + Wide Angle Lens + Telephoto Lens + Filter Kit + 2x Extended Life Batteries + Ac-dc Rapid Charger + Soft Carrying Case + Tripod & Much More !!",
           manufacturer => "Digital", currency => "USD", price => 2094.99},
           "Nikon_D300S");
     say "matches3==($matches3)";
     ok($matches3==0, "matches3");
 
-    my $matches4 = testMatchRev($prod_struct,
+    my $matches4 = testMatchRev($match_heuristics,
         {title => "NIKON D300s (camera body only) + SLRC-201 Bag + 16 GB SDHC Memory Card + Battery EN-EL3e + AN-D300 Neck Strap (ComboKit)",
          manufacturer => "Nikon", currency => "GBP", price => 1618.44},
          "Nikon_D300S");
     ok($matches4==1, "matches4");
 
-    my $matches5 = testMatchRev($prod_struct,
+    my $matches5 = testMatchRev($match_heuristics,
         {title => "Olympus Stylus Tough 3000 12 MP Digital Camera with 3.6x Wide Angle Zoom and 2.7-inch LCD (Blue)",
          manufacturer => "Olympus Canada", currency => "CAD", price => 161.87},
          "Olympus_Stylus_Tough-3000");
     ok($matches5==1, "matches5");
 
-    my $matches6 = testMatchRev($prod_struct,
+    my $matches6 = testMatchRev($match_heuristics,
         {title => "Olympus T-100 12MP Digital Camera with 3x Optical Zoom and 2.4 inch LCD (Red)",
          manufacturer => "Olympus Canada", currency => "CAD", price => 87.86},
          "Olympus-T100");
     ok($matches6==1, "matches6");
 
-    my $matches7 = testMatchRev($prod_struct,
+    my $matches7 = testMatchRev($match_heuristics,
         {title => "Sony T Series DSC-T99 14.1 Megapixel DSC Camera with Super HAD CCD Image Sensor (Silver)",
          manufacturer => "Sony", currency => "CAD", price => 196.87},
          "Sony_Cyber-shot_DSC-T99");
     ok($matches7==1, "matches7");
 
-    my $matches7a = testMatchRev($prod_struct,
+    my $matches7a = testMatchRev($match_heuristics,
         {title => "Sony Cyber-shot DSC-T99 - Digital camera - compact - 14.1 Mpix - optical zoom: 4 x - supported memory: MS Duo, SD, MS PRO Duo, SDXC, MS PRO Duo Mark2, SDHC, MS PRO-HG Duo - black",
          manufacturer => "Sony", currency => "GBP", price => "235.00"},
          "Sony_Cyber-shot_DSC-T99");
     ok($matches7a==1, "matches7a");
 
-    my $matches7b = testMatchRev($prod_struct,
+    my $matches7b = testMatchRev($match_heuristics,
         {title => "Sony T Series DSC-T99/B 14.1 Megapixel DSC Camera with Super HAD CCD Image Sensor (Black)",
          manufacturer => "Sony", currency => "CAD", price => 229.99},
          "Sony_Cyber-shot_DSC-T99");
     ok($matches7b==1, "matches7b");
 
-    my $matches7c = testMatchRev($prod_struct,
+    my $matches7c = testMatchRev($match_heuristics,
         {title => "Sony DSCT99B Cybershot Digital Camera - Black (14.1MP, 4x Optical Zoom, 3 inch LCD)",
          manufacturer => "Sony", currency => "GBP", price => 156.99},
          "Sony_Cyber-shot_DSC-T99");
     ok($matches7c==1, "matches7c");
 
-    my $matches7d = testMatchRev($prod_struct,
+    my $matches7d = testMatchRev($match_heuristics,
         {title => "Sony DSCT990B Cybershot Digital Camera - Black (14.1MP, 4x Optical Zoom, 3 inch LCD)",
          manufacturer => "Sony", currency => "GBP", price => 156.99},
          "Sony_Cyber-shot_DSC-T99");
     ok($matches7d==0, "matches7d");
 
-    my $matches7e = testMatchRev($prod_struct,
+    my $matches7e = testMatchRev($match_heuristics,
         {title => "Sony Cyber-shot DSC-T993 - Digital camera - compact - 14.1 Mpix - optical zoom: 4 x - supported memory: MS Duo, SD, MS PRO Duo, SDXC, MS PRO Duo Mark2, SDHC, MS PRO-HG Duo - black",
          manufacturer => "Sony", currency => "GBP", price => "235.00"},
           "Sony_Cyber-shot_DSC-T99");
     ok($matches7e==0, "matches7e");
 
-    my $matches8 = testMatchRev($prod_struct,
+    my $matches8 = testMatchRev($match_heuristics,
         {title => "Canon PowerShot SD4000IS 10 MP CMOS Digital Camera with 3.8x Optical Zoom and f/2.0 Lens (Silver)",
          manufacturer => "Canon Canada", currency => "CAD", price => 372.59},
          "Canon_PowerShot_SD4000_IS");
     ok($matches8==1, "matches8");
 
-    my $matches9 = testMatchRev($prod_struct,
+    my $matches9 = testMatchRev($match_heuristics,
         {title => "Olympus VR-320 228125 14 MP Digital Camera with Super-Wide 12.5x Zoom and 3.0-Inch LCD (Black)",
          manufacturer => "Olympus", currency => "USD", price => 199.00},
          "Olympus-VR320");
     ok($matches9==1, "matches9");
 
-    my $matches10 = testMatchRev($prod_struct,
+    my $matches10 = testMatchRev($match_heuristics,
         {title => "Canon EOS Rebel T1i 15.1 MP CMOS Digital SLR Camera with 3-Inch LCD and EF-S 18-55mm f/3.5-5.6 IS Lens",
          manufacturer => "Canon", currency => "CAD", price => 899.00},
          "Canon_EOS_Rebel_T1i");
     ok($matches10==1, "matches10");
 
-    my $matches11a = testMatchRev($prod_struct,
+    my $matches11a = testMatchRev($match_heuristics,
         {title => "Canon PowerShot ELPH 300 HS (Black)",
          manufacturer => "Canon Canada", currency => "CAD", price => 259.99},
          "Canon-ELPH-300HS");
     ok($matches11a==1, "matches11a");
     # in larger set of products this should not be accepted
 
-    my $matches11b = testMatchRev($prod_struct,
+    my $matches11b = testMatchRev($match_heuristics,
         {title => "Canon PowerShot ELPH 300 HS (Black)",
          manufacturer => "Canon Canada", currency => "CAD", price => 259.99},
          "Canon-ELPH-300HS");
     ok($matches11b==1, "matches11b");
 
-    my $matches12a = testMatchRev($prod_struct,
+    my $matches12a = testMatchRev($match_heuristics,
         {title => "Nikon EN-EL9a 1080mAh Ultra High Capacity Li-ion Battery Pack for Nikon D40, D40x, D60, D3000, & D5000 Digital SLR Cameras",
          manufacturer => "Nikon", currency => "CAD", price => 29.75},
          "Nikon_D3000");
-    ok($matches12a==1, "matches12a");
-    # in larger set of products this should not be accepted
+    ok($matches12a==1, "matches12a"); # TODO  This should fail if I improve accessory detection.
 
-    my $matches12b = testMatchRev($prod_struct,
+    my $matches12b = testMatchRev($match_heuristics,
         {title => "Nikon EN-EL9a 1080mAh Ultra High Capacity Li-ion Battery Pack for Nikon D40, D40x, D60, D3000, & D5000 Digital SLR Cameras",
          manufacturer => "Nikon", currency => "CAD", price => 29.75},
          "Nikon_D5000");
     ok($matches12b==0, "matches12b");
     # in larger set of products this should not be accepted
 
-    my $matches13a = testMatchRev($prod_struct,
+    my $matches13a = testMatchRev($match_heuristics,
         {title => "PENTAX Optio WG-1 GPS 14 MP Rugged Waterproof Digital Camera with 5X Optical Zoom, 2.7-inch LCD and GPS Funtionality (Green )",
          manufacturer => "Pentax Canada", currency => "CAD", price => 387.33},
          "Pentax-WG-1-GPS");
     ok($matches13a==1, "matches13a");
 
-    my $matches13b = testMatchRev($prod_struct,
+    my $matches13b = testMatchRev($match_heuristics,
         {title => "PENTAX Optio WG-1 GPS 14 MP Rugged Waterproof Digital Camera with 5X Optical Zoom, 2.7-inch LCD and GPS Funtionality (Green )",
          manufacturer =>"Pentax Canada", currency => "CAD", price => 387.33},
          "Pentax-WG-1-GPS");
@@ -230,33 +226,30 @@ sub testMatchingB
         {manufacturer => "Olympus Canada"},
     ];
 
-    my $prod_struct = prodSystemInit();
-    prodSystemMapManufListings( $prod_struct, $products, $listings);
+    my $match_heuristics = matchHeuristics->new();
+    $match_heuristics->prodSystemMapManufListings($products, $listings);
     say "done map";
-    foreach my $prod ( @$products )
-    {
-        prodSystemTrackProduct($prod_struct, $prod);
-    }
+    $match_heuristics->prodSystemTrackProductList($products, undef);
     say "done product tracking";
 
-    my $matchesB0 = testMatchRev($prod_struct,
+    my $matchesB0 = testMatchRev($match_heuristics,
         { title => "Panasonic Lumix FZ40 Black 24x Zoom Leica Lens Taxes Included!", manufacturer => "Panasonic", currency => "CAD", price => "469.95"},
         "Panasonic_Lumix_DMC-FZ40");
     ok($matchesB0==1, "matchesB0");
 
-    my $matchesB1 = testMatchRev($prod_struct,
+    my $matchesB1 = testMatchRev($match_heuristics,
         { title => "Panasonic Lumix DMC-FZ40 Digital Camera + Best Value 8GB, Carrying Case, Mini HDMI Cable & Tripod Complete Accessories Package",
           manufacturer => "Digital", currency => "USD", price => "749.95"},
         "Panasonic_Lumix_DMC-FZ40");
     ok($matchesB1==0, "matchesB1");
 
-    my $matchesB2 = testMatchRev($prod_struct,
+    my $matchesB2 = testMatchRev($match_heuristics,
         { title => "Olympus PEN E-PL1 12.3MP Live MOS Micro Four Thirds Interchangeable Lens Digital Camera with 14-42mm f/3.5-5.6 Zuiko Digital Zoom Lens (Black)",
           manufacturer => "Olympus Canada", currency => "CAD", price => "429.98"},
           "Olympus_PEN_E-PL1");
     ok($matchesB2==1, "matchesB2");
 
-    my $matchesB3 = testMatchRev($prod_struct,
+    my $matchesB3 = testMatchRev($match_heuristics,
         { title => "Olympus PEN E-PL1 Digital Camera (Navy Blue) with Olympus 14-42mm Micro Four Thirds Lens + SSE Best Value 8GB, Deluxe Carrying Case, Batteries, Lens & Tripod Complete Accessories Package",
           manufacturer => "Digital", currency => "USD", price => "539.95"},
          "Olympus_PEN_E-PL1");
@@ -272,66 +265,66 @@ sub testMatchingC
 {
     my $products = [
         { product_name => "Nikon-s6100", manufacturer => "Nikon", model => "S6100", family => "Coolpix", "announced-date" => "2011-02-08T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_900S", manufacturer => "Nikon", model => "900S", family => "Coolpix", "announced-date" => "1998-10-25T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_L100", manufacturer => "Nikon", model => "L100", family => "Coolpix", "announced-date" => "2009-02-02T19:00:00.000-05:00"},
-        { product_name => "Nikon-s4100", manufacturer => "Nikon", model => "S4100", family => "Coolpix", "announced-date" => "2011-02-08T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_100", manufacturer => "Nikon", model => "100", family => "Coolpix", "announced-date" => "1997-01-19T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_S5100", manufacturer => "Nikon", model => "S5100", family => "Coolpix", "announced-date" => "2010-08-16T20:00:00.000-04:00"},
-        { product_name => "Nikon_Coolpix_950", manufacturer => "Nikon", model => "950", family => "Coolpix", "announced-date" => "1999-02-14T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_S640", manufacturer => "Nikon", model => "S640", family => "Coolpix", "announced-date" => "2009-08-03T20:00:00.000-04:00"},
-        { product_name => "Nikon_Coolpix_S1000pj", manufacturer => "Nikon", model => "S1000pj", family => "Coolpix", "announced-date" => "2009-08-03T20:00:00.000-04:00"},
-        { product_name => "Nikon_Coolpix_S4000", manufacturer => "Nikon", model => "S4000", family => "Coolpix", "announced-date" => "2010-02-02T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_S620", manufacturer => "Nikon", model => "S620", family => "Coolpix", "announced-date" => "2009-02-02T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_L19", manufacturer => "Nikon", model => "L19", family => "Coolpix", "announced-date" => "2009-02-02T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_S8000", manufacturer => "Nikon", model => "S8000", family => "Coolpix", "announced-date" => "2010-02-02T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_900", manufacturer => "Nikon", model => "900", family => "Coolpix", "announced-date" => "1998-03-15T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_S630", manufacturer => "Nikon", model => "S630", family => "Coolpix", "announced-date" => "2009-02-02T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_990", manufacturer => "Nikon", model => "990", family => "Coolpix", "announced-date" => "2000-01-26T19:00:00.000-05:00"},
-        { product_name => "Nikon-s3100", manufacturer => "Nikon", model => "S3100", family => "Coolpix", "announced-date" => "2011-02-08T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_L110", manufacturer => "Nikon", model => "L110", family => "Coolpix", "announced-date" => "2010-02-02T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_S1100pj", manufacturer => "Nikon", model => "S1100pj", family => "Coolpix", "announced-date" => "2010-08-16T20:00:00.000-04:00"},
-        { product_name => "Nikon-D5100", manufacturer => "Nikon", model => "D5100", "announced-date" => "2011-04-04T20:00:00.000-04:00"},
-        { product_name => "Nikon_Coolpix_S70", manufacturer => "Nikon", model => "S70", family  =>  "Coolpix",  "announced-date" => "2009-08-03T20:00:00.000-04:00"},
-        { product_name => "Nikon_Coolpix_S3000", manufacturer => "Nikon", model => "S3000", family => "Coolpix", "announced-date" => "2010-02-02T19:00:00.000-05:00"},
-        { product_name => "Nikon_D3S", manufacturer => "Nikon", model => "D3S", "announced-date" => "2009-10-13T20:00:00.000-04:00"},
-        { product_name => "Nikon_Coolpix_800", manufacturer => "Nikon", model => "800", family  =>  "Coolpix",  "announced-date" => "1999-09-26T20:00:00.000-04:00"},
+        #{ product_name => "Nikon_Coolpix_900S", manufacturer => "Nikon", model => "900S", family => "Coolpix", "announced-date" => "1998-10-25T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_L100", manufacturer => "Nikon", model => "L100", family => "Coolpix", "announced-date" => "2009-02-02T19:00:00.000-05:00"},
+        #{ product_name => "Nikon-s4100", manufacturer => "Nikon", model => "S4100", family => "Coolpix", "announced-date" => "2011-02-08T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_100", manufacturer => "Nikon", model => "100", family => "Coolpix", "announced-date" => "1997-01-19T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_S5100", manufacturer => "Nikon", model => "S5100", family => "Coolpix", "announced-date" => "2010-08-16T20:00:00.000-04:00"},
+        #{ product_name => "Nikon_Coolpix_950", manufacturer => "Nikon", model => "950", family => "Coolpix", "announced-date" => "1999-02-14T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_S640", manufacturer => "Nikon", model => "S640", family => "Coolpix", "announced-date" => "2009-08-03T20:00:00.000-04:00"},
+        #{ product_name => "Nikon_Coolpix_S1000pj", manufacturer => "Nikon", model => "S1000pj", family => "Coolpix", "announced-date" => "2009-08-03T20:00:00.000-04:00"},
+        #{ product_name => "Nikon_Coolpix_S4000", manufacturer => "Nikon", model => "S4000", family => "Coolpix", "announced-date" => "2010-02-02T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_S620", manufacturer => "Nikon", model => "S620", family => "Coolpix", "announced-date" => "2009-02-02T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_L19", manufacturer => "Nikon", model => "L19", family => "Coolpix", "announced-date" => "2009-02-02T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_S8000", manufacturer => "Nikon", model => "S8000", family => "Coolpix", "announced-date" => "2010-02-02T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_900", manufacturer => "Nikon", model => "900", family => "Coolpix", "announced-date" => "1998-03-15T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_S630", manufacturer => "Nikon", model => "S630", family => "Coolpix", "announced-date" => "2009-02-02T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_990", manufacturer => "Nikon", model => "990", family => "Coolpix", "announced-date" => "2000-01-26T19:00:00.000-05:00"},
+        #{ product_name => "Nikon-s3100", manufacturer => "Nikon", model => "S3100", family => "Coolpix", "announced-date" => "2011-02-08T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_L110", manufacturer => "Nikon", model => "L110", family => "Coolpix", "announced-date" => "2010-02-02T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_S1100pj", manufacturer => "Nikon", model => "S1100pj", family => "Coolpix", "announced-date" => "2010-08-16T20:00:00.000-04:00"},
+        #{ product_name => "Nikon-D5100", manufacturer => "Nikon", model => "D5100", "announced-date" => "2011-04-04T20:00:00.000-04:00"},
+        #{ product_name => "Nikon_Coolpix_S70", manufacturer => "Nikon", model => "S70", family  =>  "Coolpix",  "announced-date" => "2009-08-03T20:00:00.000-04:00"},
+        #{ product_name => "Nikon_Coolpix_S3000", manufacturer => "Nikon", model => "S3000", family => "Coolpix", "announced-date" => "2010-02-02T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_D3S", manufacturer => "Nikon", model => "D3S", "announced-date" => "2009-10-13T20:00:00.000-04:00"},
+        #{ product_name => "Nikon_Coolpix_800", manufacturer => "Nikon", model => "800", family  =>  "Coolpix",  "announced-date" => "1999-09-26T20:00:00.000-04:00"},
         { product_name => "Nikon-L120", manufacturer => "Nikon", model => "L120", family => "Coolpix", "announced-date" => "2011-02-07T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_S570", manufacturer => "Nikon", model => "S570", family => "Coolpix", "announced-date" => "2009-08-03T20:00:00.000-04:00"},
+        #{ product_name => "Nikon_Coolpix_S570", manufacturer => "Nikon", model => "S570", family => "Coolpix", "announced-date" => "2009-08-03T20:00:00.000-04:00"},
         { product_name => "Nikon_D7000", manufacturer => "Nikon", model => "D7000", "announced-date" => "2010-09-14T20:00:00.000-04:00"},
-        { product_name => "Nikon_Coolpix_S8100", manufacturer => "Nikon", model => "S8100", family  =>  "Coolpix",  "announced-date" => "2010-09-07T20:00:00.000-04:00"},
-        { product_name => "Nikon_Coolpix_300", manufacturer => "Nikon", model => "300", family => "Coolpix", "announced-date" => "1997-01-02T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_S220", manufacturer => "Nikon", model => "S220", family => "Coolpix", "announced-date" => "2009-02-02T19:00:00.000-05:00"},
-        { product_name => "Nikon_D3100", manufacturer => "Nikon", model => "D3100","announced-date" => "2010-08-18T20:00:00.000-04:00"},
-        { product_name => "Nikon-P300", manufacturer => "Nikon", model => "P300", family  =>  "Coolpix",  "announced-date" => => "2011-02-07T19:00:00.000-05:00"},
-        { product_name => "Nikon_D3000", manufacturer => "Nikon", model => "D3000", "announced-date" => "2009-07-29T20:00:00.000-04:00"},
-        { product_name => "Nikon-l24", manufacturer => "Nikon", model => "L24", family  =>  "Coolpix",  "announced-date" => => "2011-02-08T19:00:00.000-05:00"},,
-        { product_name => "Nikon_Coolpix_880", manufacturer => "Nikon", model => "880", family => "Coolpix", "announced-date" => "2000-08-27T20:00:00.000-04:00"},
-        { product_name => "Nikon_Coolpix_S6000", manufacturer => "Nikon", model => "S6000", family => "Coolpix", "announced-date" => "2010-02-02T19:00:00.000-05:00"},
-        { product_name => "nikon-s9100", manufacturer => "Nikon", model => "S9100", family => "Coolpix", "announced-date" => "2011-02-02T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_S80", manufacturer => "Nikon", model => "S80", family => "Coolpix", "announced-date" => "2010-09-07T20:00:00.000-04:00"},
-        { product_name => "Nikon-P500", manufacturer => "Nikon", model => "P500", family => "Coolpix", "announced-date" => "2011-02-07T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_P90", manufacturer => "Nikon", model => "P90", family => "Coolpix", "announced-date" => "2009-02-02T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_P100", manufacturer => "Nikon", model => "P100", family => "Coolpix", "announced-date" => "2010-02-02T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_S8100", manufacturer => "Nikon", model => "S8100", family  =>  "Coolpix",  "announced-date" => "2010-09-07T20:00:00.000-04:00"},
+        #{ product_name => "Nikon_Coolpix_300", manufacturer => "Nikon", model => "300", family => "Coolpix", "announced-date" => "1997-01-02T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_S220", manufacturer => "Nikon", model => "S220", family => "Coolpix", "announced-date" => "2009-02-02T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_D3100", manufacturer => "Nikon", model => "D3100","announced-date" => "2010-08-18T20:00:00.000-04:00"},
+        #{ product_name => "Nikon-P300", manufacturer => "Nikon", model => "P300", family  =>  "Coolpix",  "announced-date" => => "2011-02-07T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_D3000", manufacturer => "Nikon", model => "D3000", "announced-date" => "2009-07-29T20:00:00.000-04:00"},
+        #{ product_name => "Nikon-l24", manufacturer => "Nikon", model => "L24", family  =>  "Coolpix",  "announced-date" => => "2011-02-08T19:00:00.000-05:00"},,
+        #{ product_name => "Nikon_Coolpix_880", manufacturer => "Nikon", model => "880", family => "Coolpix", "announced-date" => "2000-08-27T20:00:00.000-04:00"},
+        #{ product_name => "Nikon_Coolpix_S6000", manufacturer => "Nikon", model => "S6000", family => "Coolpix", "announced-date" => "2010-02-02T19:00:00.000-05:00"},
+        #{ product_name => "nikon-s9100", manufacturer => "Nikon", model => "S9100", family => "Coolpix", "announced-date" => "2011-02-02T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_S80", manufacturer => "Nikon", model => "S80", family => "Coolpix", "announced-date" => "2010-09-07T20:00:00.000-04:00"},
+        #{ product_name => "Nikon-P500", manufacturer => "Nikon", model => "P500", family => "Coolpix", "announced-date" => "2011-02-07T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_P90", manufacturer => "Nikon", model => "P90", family => "Coolpix", "announced-date" => "2009-02-02T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_P100", manufacturer => "Nikon", model => "P100", family => "Coolpix", "announced-date" => "2010-02-02T19:00:00.000-05:00"},
         { product_name => "Nikon_Coolpix_L20", manufacturer => "Nikon", model => "L20", family => "Coolpix", "announced-date" => "2009-02-02T19:00:00.000-05:00"},
         { product_name => "Nikon_D1", manufacturer => "Nikon", model => "D1", "announced-date" => "1999-06-14T20:00:00.000-04:00"},
         { product_name => "Nikon_Coolpix_L21", manufacturer => "Nikon", model => "L21", family  =>  "Coolpix",  "announced-date" => "2010-02-02T19:00:00.000-05:00"},
         { product_name => "Nikon_D300S", manufacturer => "Nikon", model => "D300S", "announced-date" => "2009-07-29T20:00:00.000-04:00"},
         { product_name => "Nikon_Coolpix_S230", manufacturer => "Nikon", model => "S230", family  =>  "Coolpix",  "announced-date" => "2009-02-02T19:00:00.000-05:00"},
         { product_name => "Nikon_Coolpix_600", manufacturer => "Nikon", model => "600", family => "Coolpix", "announced-date" => "1998-03-15T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_L22", manufacturer => "Nikon", model => "L22", family => "Coolpix", "announced-date" => "2010-02-02T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_700", manufacturer => "Nikon", model => "700", family => "Coolpix", "announced-date" => "1999-02-14T19:00:00.000-05:00"},
-        { product_name => "Nikon_Coolpix_P7000", manufacturer => "Nikon", model => "P7000", family => "Coolpix", "announced-date" => "2010-09-07T20:00:00.000-04:00"},
-        { product_name => "Nikon_D5000", manufacturer => "Nikon", model => "D5000", "announced-date" => "2009-04-13T20:00:00.000-04:00"},
+        #{ product_name => "Nikon_Coolpix_L22", manufacturer => "Nikon", model => "L22", family => "Coolpix", "announced-date" => "2010-02-02T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_700", manufacturer => "Nikon", model => "700", family => "Coolpix", "announced-date" => "1999-02-14T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_Coolpix_P7000", manufacturer => "Nikon", model => "P7000", family => "Coolpix", "announced-date" => "2010-09-07T20:00:00.000-04:00"},
+        #{ product_name => "Nikon_D5000", manufacturer => "Nikon", model => "D5000", "announced-date" => "2009-04-13T20:00:00.000-04:00"},
 
         { product_name => "Panasonic_Lumix_DMC-FZ40", manufacturer => "Panasonic", model => "DMC-FZ40", family  =>  "Lumix",  "announced-date" => => "2010-07-16T20:00:00.000-04:00"},,
-        { product_name => "Olympus-E-PL2", manufacturer => "Olympus", model => "PEN E-PL2", "announced-date" => "2010-12-31T19:00:00.000-05:00"},
-        { product_name => "Sony_Alpha_DSLR-A390", manufacturer => "Sony", model => "DSLR-A390", family => "Alpha", "announced-date" => "2010-06-08T20:00:00.000-04:00"},
-        { product_name => "Canon-T3", manufacturer => "Canon", model => "T3", family => "Rebel", "announced-date" => "2011-02-06T19:00:00.000-05:00"},
-        { product_name => "Nikon_D7000", manufacturer => "Nikon", model => "D7000", "announced-date" => "2010-09-14T20:00:00.000-04:00"},
-        { product_name => "Nikon_D3100", manufacturer => "Nikon", model => "D3100", "announced-date" => "2010-08-18T20:00:00.000-04:00"},
-        { product_name => "Sigma_DP1x", manufacturer => "Sigma", model => "DP1x", "announced-date" => "2010-02-19T19:00:00.000-05:00"},
-        { product_name => "Nikon_D300S", manufacturer => "Nikon", model => "D300S", "announced-date" => "2009-07-29T20:00:00.000-04:00"},
-        { product_name => "Nikon_D5000", manufacturer => "Nikon", model => "D5000", "announced-date" => "2009-04-13T20:00:00.000-04:00"},
+        #{ product_name => "Olympus-E-PL2", manufacturer => "Olympus", model => "PEN E-PL2", "announced-date" => "2010-12-31T19:00:00.000-05:00"},
+        #{ product_name => "Sony_Alpha_DSLR-A390", manufacturer => "Sony", model => "DSLR-A390", family => "Alpha", "announced-date" => "2010-06-08T20:00:00.000-04:00"},
+        #{ product_name => "Canon-T3", manufacturer => "Canon", model => "T3", family => "Rebel", "announced-date" => "2011-02-06T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_D7000", manufacturer => "Nikon", model => "D7000", "announced-date" => "2010-09-14T20:00:00.000-04:00"},
+        #{ product_name => "Nikon_D3100", manufacturer => "Nikon", model => "D3100", "announced-date" => "2010-08-18T20:00:00.000-04:00"},
+        #{ product_name => "Sigma_DP1x", manufacturer => "Sigma", model => "DP1x", "announced-date" => "2010-02-19T19:00:00.000-05:00"},
+        #{ product_name => "Nikon_D300S", manufacturer => "Nikon", model => "D300S", "announced-date" => "2009-07-29T20:00:00.000-04:00"},
+        #{ product_name => "Nikon_D5000", manufacturer => "Nikon", model => "D5000", "announced-date" => "2009-04-13T20:00:00.000-04:00"},
     ];
     my $listings = [ # just need to build manufacturer mapping from this list
         {manufacturer => "Panasonic"},
@@ -342,20 +335,22 @@ sub testMatchingC
         {manufacturer => "Olympus Canada"},
     ];
 
-    my $prod_struct = prodSystemInit();
-    prodSystemMapManufListings( $prod_struct, $products, $listings);
+    my $match_heuristics = matchHeuristics->new();
+    $match_heuristics->prodSystemMapManufListings($products, $listings);
     say "done map";
-    foreach my $prod ( @$products )
-    {
-        prodSystemTrackProduct($prod_struct, $prod);
-    }
+    $match_heuristics->prodSystemTrackProductList($products, undef);
     say "done product tracking";
 
-    my $matchesC0 = testMatchRev($prod_struct,
+    my $matchesC0 = testMatchRev($match_heuristics,
         { title => "Nikon Coolpix P80 10.1MP Digital Camera with 18x Wide Angle Optical Vibration Reduction Zoom (Black)",
           manufacturer => "Nikon", currency => "USD", price => 184.99},
-        "Nikon_D1"); # FIXME  Nikon_D1 is wrong but works right now
-    ok($matchesC0==1, "matchesC0");
+        "Nikon_D1");
+    ok($matchesC0==0, "matchesC0");
+
+    my $matchesC1 = testMatchRev($match_heuristics,
+        { title => "Nikon D7000 + AF-S 24-120 mm f4G ED VR", manufacturer => "Nikon", currency => "EUR", price => 2225.00},
+        "Nikon_D7000");
+    ok($matchesC1==1, "matchesC1");
 
 }
 
@@ -370,8 +365,8 @@ sub testMatchingC
 #   1 if a match occurred and produced the expected product name, 0 if not
 sub testMatchRev
 {
-    my ( $prod_struct, $listing, $prod_name ) = @_;
-    my ( $prod, $no_manuf ) = prodSystemListingBestMatch($prod_struct,
+    my ( $match_heuristics, $listing, $prod_name ) = @_;
+    my ( $prod, $no_manuf ) = $match_heuristics->prodSystemListingBestMatch(
                                                          $listing);
     my $matches = 0;
     if ( $no_manuf )

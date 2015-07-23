@@ -6,13 +6,25 @@ package matchHeuristics;
 use Modern::Perl 2013;
 use autodie;
 use Data::Dumper;
+use Time::HiRes qw/gettimeofday/;
 
-use Exporter;
-our @ISA = ("Exporter");
-our @EXPORT = qw(&prodSystemInit &prodSystemTrackProduct &prodSystemMapManufListings
-                 &prodSystemTrackProductList
-                 &prodSystemListingBestMatch &parseExpressionFromProdField
-                 applyParseRE);
+#use Exporter;
+#our @ISA = ("Exporter");
+#our @EXPORT = qw(&prodSystemInit &prodSystemTrackProduct &prodSystemMapManufListings
+#                 &prodSystemTrackProductList
+#                 &prodSystemListingBestMatch &parseExpressionFromProdField
+#                 applyParseRE);
+
+# new() -- Constructor for matchHeuristics class.
+sub new
+{
+    my $classname = shift;
+    my $self = { };
+    bless($self, $classname);
+    $self->prodSystemInit(@_);
+    return $self;
+}
+
 
 # createManufacturerMapping() -- Take list of product manufacturer values, and
 # list of listing manufacturer values.  Figure out which manufacturer names in
@@ -66,16 +78,25 @@ sub createManufacturerMapping
 }
 
 
+# prodSystemInit() -- Initialise basic structure for matchHeuristics.
 sub prodSystemInit
 {
-    my $prod_struct = { manuf_division => {} };
-    return $prod_struct;
+    my $self = shift;
+    $self->{manuf_division} = {};
 }
 
 
+# prodSystemMapManufListings() -- Do some initialisation of the matchHeuristics
+# structure with products and listings.  This is intended to be run after the
+# constructor.
+# When this call has finished,
+#   - all the products will be known and organised by manufacturer
+#   - the mapping will be known between listing manufacturer names
+#     and the corresponding product manufacturer names.
 sub prodSystemMapManufListings
 {
-    my ( $prod_struct, $products, $listings ) = @_;
+    my $self = shift;
+    my ( $products, $listings ) = @_;
     my @product_keys;
     foreach my $prod ( @$products )
     {
@@ -86,16 +107,23 @@ sub prodSystemMapManufListings
     {
         push(@listing_keys, $list->{manufacturer});
     }
-    $prod_struct->{manuf_map} = createManufacturerMapping(\@product_keys, \@listing_keys);
+    $self->{manuf_map} = createManufacturerMapping(\@product_keys, \@listing_keys);
 }
 
 
+# prodSystemTrackProduct() -- Take an individual product and set up structures
+# in the matchHeuristics object to have an organised representation of it.
+# This includes extra pre-processed representation of search fields.
 sub prodSystemTrackProduct
 {
-    my ( $prod_struct, $prod ) = @_;
-    my $manuf_division = $prod_struct->{manuf_division};
+    my $self = shift;
+    my ( $prod ) = @_;
+    my $manuf_division = $self->{manuf_division};
     my $manuf = $prod->{manufacturer};
+    my $product_name_pe = parseExpressionFromProdField($prod->{product_name}, 1);
     my $model_pe = parseExpressionFromProdField($prod->{model}, 0);
+    $prod->{product_name_pe} = $product_name_pe;
+    $prod->{product_name_re} = qr/$product_name_pe/i;
     $prod->{model_pe} = $model_pe;
     $prod->{model_re} = qr/$model_pe/i;
     if ( exists($prod->{family}) )
@@ -117,62 +145,72 @@ sub prodSystemTrackProduct
 }
 
 
+# prodSystemTrackProductList() -- Take a list of all products, and set them up
+# fully in the matchHeuristics structure.  Also, prepare the results structure
+# as an empty list for each product name, so it is ready for subsequent
+# population with listings.
 sub prodSystemTrackProductList
 {
-    my ($prod_struct, $prod_list) = @_;
+    my $self = shift;
+    my ( $prod_list, $results ) = @_;
     my %prod_name_used;
     foreach my $prod ( @$prod_list )
     {
-        prodSystemTrackProduct($prod_struct, $prod);
+        $self->prodSystemTrackProduct($prod);
         if ( exists($prod_name_used{$prod->{product_name}}) )
         {
             die "Duplicate product name $prod->{product_name}";
         }
+        if ( defined($results) )
+        {
+            $results->{$prod->{product_name}} = [];
+        }
         $prod_name_used{$prod->{product_name}} = 1;
     }
+
+    say "done prodSystemTrackProductList()";
 }
 
 
+# prodSystemListingBestMatch() -- Take the given listing and find the best
+# match for it amongst all known product data.
+# Parameter:
+#   $listing:  listing structure
+# Return values:
+#   product reference, or undef if none found
+#   indicator whether manufacturer match was even found:  1 if so, 0 if not
 sub prodSystemListingBestMatch
 {
-    my ( $prod_struct, $listing ) = @_;
-    #print Dumper($prod_struct);
+    my $self = shift;
+    my ( $listing ) = @_;
+    #print Dumper($self);
     my $match_strength = 0;
     my $manuf = $listing->{manufacturer};
-    my $manuf_map = $prod_struct->{manuf_map};
+    my $manuf_map = $self->{manuf_map};
     $manuf = $manuf_map->{$manuf}; # map to product manuf name
     my $prod = undef;
     if ( defined($manuf) )
     {
-        my $product_list = $prod_struct->{manuf_division}{$manuf};
-        #my $smat = 0;
+        my $product_list = $self->{manuf_division}{$manuf};
         my @prod_ind_list;
         if ( defined($manuf) and defined($product_list) )
         {
             for ( my $i = 0;  $i<@$product_list;  ++$i )
             {
                 my $strength = matchListingProduct($listing, $product_list->[$i] );
-                #say "trying product $i:  strength==$strength";
                 if ( $strength>$match_strength )
                 {
                     $match_strength = $strength;
-                    #push(@prod_ind_list, $i);
-                    #++$smat;
                     @prod_ind_list = ( $i ); # clear out old list of lower strength
                     #say "pushing (first) $i ($product_list->[$i]{product_name}) with strength $strength";
                 }
                 elsif ( $strength>0 and $strength==$match_strength )
                 {
-                    #say "strength matches";
-                    #++$smat;
                     push(@prod_ind_list, $i);
                     #say "pushing $i ($product_list->[$i]{product_name}) with strength $strength";
                 }
             }
         }
-        #say "smat==$smat";
-        #my $prod = undef;
-        #$prod = $product_list->[$prod_ind]  if ( $prod_ind>=0 );
         $prod = getBestProd($product_list, \@prod_ind_list);
     }
     return ( $prod, (not defined($manuf)) );
@@ -181,26 +219,33 @@ sub prodSystemListingBestMatch
 
 use constant MAX_PRODUCT_COMPLEXITY => 999_999_999;
 
+# getBestProd() -- Support routine for prodSystemListingBestMatch().
+# Take product list for relevant manufacturer, and index list on that product
+# list.  These are entries found to have an equal, best matching strength.
+# Follow a higher-level metric to pick the best matching entry from that list.
+# Return its reference.
 sub getBestProd
 {
     my ($product_list, $prod_ind_list) = @_;
     my ( $prod, $max_prod_complexity, $min_prod_complexity ) = ( undef, 0, MAX_PRODUCT_COMPLEXITY );
     foreach my $i ( @$prod_ind_list )
     {
-        #say "getBestProd() $i";
         my $p = $product_list->[$i];
         my $comp = productComplexity($p);
-        #( $prod, $min_prod_complexity ) = ( $p, $comp )  if ( $comp<$min_prod_complexity );
         ( $prod, $max_prod_complexity ) = ( $p, $comp )  if ( $comp>$max_prod_complexity );
     }
     return $prod;
 }
 
 
+use constant PROD_COMPLEXITY_MODEL_WEIGHT => 1000;
+
+# productComplexity() -- Metric for determining higher-level complexity
+# of the product.  This is used as a top-level tiebreak by getBestProd().
 sub productComplexity
 {
     my ( $prod ) = @_;
-    my $comp = 1000*length($prod->{model});
+    my $comp = PROD_COMPLEXITY_MODEL_WEIGHT*length($prod->{model});
     $comp += length($prod->{family})  if ( exists($prod->{family}) );
     return $comp;
 }
@@ -212,16 +257,19 @@ sub matchListingProduct
 {
     my ($listing, $product ) = @_;
     my $stren = 0;
+    my $product_name_match_len = applyParseRE($product->{product_name_re}, $listing->{title});
     my $model_match_len = applyParseRE($product->{model_re}, $listing->{title});
     my $family_match_len = 0;
     if ( $model_match_len>0 && exists($product->{family_re}) )
     {
         $family_match_len = applyParseRE($product->{family_re}, $listing->{title});
     }
+    #say "product_name==($product->{product_name}), product_name_pe==($product->{product_name_pe})"  if ( exists($product->{product_name}) );
+    #say "product_name_match_len==$product_name_match_len, family_match_len==$family_match_len, title==($listing->{title})";
     #say "model==($product->{model}), model_pe==($product->{model_pe})"  if ( exists($product->{model}) );
     #say "model_match_len==$model_match_len, family_match_len==$family_match_len, title==($listing->{title})";
     #say "family==($product->{family}), family_pe==($product->{family_pe})"  if ( exists($product->{family}) );
-    $stren = computeMatchStrength($model_match_len, $family_match_len);
+    $stren = computeMatchStrength($product_name_match_len, $model_match_len, $family_match_len);
     #say "  stren==$stren";
     return $stren;
 }
@@ -230,8 +278,8 @@ sub matchListingProduct
 # parseExpressionFromProdField() -- Generate parse expression from field.
 # Parameters:
 #   $field:  field for which to build matching expression
-#   $allow_letter_suffix:  option whether letter suffix such as "D" can be
-#   allowed after numeric field
+#   $high_precision:  option whether to increase precision (e.g. make fewer
+#     things optional)
 # Return value:
 #   String representing parse expression that can be used in regex to match
 #   appropriate values from a listing.
@@ -252,21 +300,19 @@ sub matchListingProduct
 #   but not "a300" or "D3000" or "d300s".
 sub parseExpressionFromProdField
 {
-    my ( $field, $allow_letter_suffix ) = @_;
+    my ( $field, $high_precision ) = @_;
     my $pe = "";
     my @field_list = split(m/_|-|:|\s/, $field);
     my @mod_field_list;
     foreach my $f ( @field_list )
     {
-        #if ( $allow_letter_suffix )
-        #{
-        #    $f .= "[A-Za-z]?"  if ( $f =~ m/\d+$/ );
-        #}
-        #else
-        #{
-        #    $f .= "\\b"  if ( $f =~ m/\d+$/ );
-        #}
-        if ( $f =~ m/^(.*[a-zA-Z])([0-9].*)$/ )
+        # Very short fields such as "D1" must match exactly, without being
+        # broken into parts.
+        if ( length($f)<=2 )
+        {
+            push(@mod_field_list, $f);
+        }
+        elsif ( $f =~ m/^(.*[a-zA-Z])([0-9].*)$/ )
         {
             push(@mod_field_list, $1);
             push(@mod_field_list, $2);
@@ -276,41 +322,51 @@ sub parseExpressionFromProdField
             push(@mod_field_list, $f);
         }
     }
-    #$pe = join("[_ -:]+", @mod_field_list);
-    #$pe = join("\\[_ -:\\]+", @mod_field_list);
-    #$pe = join("\\[_ -\\]+", @mod_field_list);
-    #say "mod_field_list==(@mod_field_list)";
     for ( my $i = 0;  $i<@mod_field_list;  ++$i )
     {
         my $f = $mod_field_list[$i];
-        if ( $i>0 )
+        if ( $high_precision )
         {
-            #$f = "([_ -:]+$f)?";
-            #$f = "([_ -:]*$f)?";
-            if ( $f =~ m/^\d+$/ )
+            if ( $i>0 )
             {
-                $f = "([_ -:]*(?<!\\d)$f(?!\\d))";
-            }
-            else
-            {
-                $f = "([_ -:]*$f)";
+                $f = "([_ -:]*\\b$f\\b)";
             }
         }
-        elsif ( $i==0 and @mod_field_list>1 )
+        else
         {
-            if ( $f =~ m/^\d+$/ )
+            if ( $i>0 )
             {
-                $f = "((?<!\\d)$f(?!\\d))?";
+                if ( $f =~ m/^\d+$/ )
+                {
+                    $f = "([_ :-]*(?<!\\d)$f(?!\\d))";
+                }
+                else
+                {
+                    $f = "([_ :-]*$f)";
+                }
             }
-            else
+            elsif ( $i==0 and @mod_field_list>1 )
             {
-                $f = "($f)?";
+                if ( $f =~ m/^\d+$/ )
+                {
+                    $f = "((?<!\\d)$f(?!\\d))?";
+                }
+                elsif ( length($f)>=2 )
+                {
+                    $f = "($f)?";
+                }
+                else
+                {
+                    $f = "($f)";
+                }
             }
         }
         $pe .= $f;
     }
     return $pe;
 }
+
+
 # applyParseRE() -- Apply parse regex from parseExpressionFromProdField(),
 # to string.  Return 0 if nothing matched, or length of match if it did match.
 sub applyParseRE
@@ -326,12 +382,59 @@ sub applyParseRE
 }
 
 
+use constant MATCH_STRENGTH_MODEL_WEIGHT => 1000;
+use constant MATCH_STRENGTH_PRODUCT_WEIGHT => 10000;
+use constant MATCH_STRENGTH_PRODUCT_OFFSET => 500_000;
+
 # computeMatchStrength() -- Compute strength of match result.
 # This is a basic heuristic against which matches are compared.
 sub computeMatchStrength
 {
-    my ( $model_len, $family_len ) = @_;
-    return 1000*$model_len+$family_len;
+    my ( $product_name_len, $model_len, $family_len ) = @_;
+    my $stren = MATCH_STRENGTH_MODEL_WEIGHT*$model_len+$family_len;
+    if ( $product_name_len>0 )
+    {
+        $stren += MATCH_STRENGTH_PRODUCT_OFFSET+MATCH_STRENGTH_MODEL_WEIGHT*$product_name_len;
+    }
+    return $stren;
+}
+
+
+# "Samsung_WB600" --> "WB600"
+# "Nikon_Coolpix_S620" --> "S620"
+# "Canon_PowerShot_G12" --> "G12"
+# "Sanyo_VPC-Z400" --> "Z400"
+# "Kodak_DC290" --> "DC290"
+# "Kodak_EasyShare_M380" --> "M380"
+# "Olympus_E-600" --> "E600"
+# "Olympus_SP-600_UZ" --> "SP600"
+# "Fujifilm_FinePix_S200EXR" --> S200
+# "ABC123" --> "ABC123"
+# "Nikon_D7000" --> "D7000"
+# "blah blah blah" --> undef
+# getSimpleProductNameIndicator() -- Proposed additional product discriminator
+# function that is not in use now.
+sub getSimpleProductNameIndicator
+{
+    my ( $model ) = @_;
+    my $mmn = undef;
+    if ( $model =~ m/(?<![a-zA-Z\d])([a-zA-Z]+\d+)(?![a-zA-Z\d])/ )
+    {
+        $mmn = $1;
+    }
+    elsif ( $model =~ m/(?<![a-zA-Z\d])([a-zA-Z]+)[ :_-]+(\d+)(?![a-zA-Z\d])/ )
+    {
+        $mmn = "$1$2";
+    }
+    elsif ( $model =~ m/(?<![a-zA-Z\d])([a-zA-Z]+\d+[a-zA-Z]+)(?![a-zA-Z\d])/ )
+    {
+        $mmn = $1;
+    }
+    elsif ( $model =~ m/(?<![a-zA-Z\d])([a-zA-Z]+)[ :_-]+(\d+)(?![a-zA-Z\d])/ )
+    {
+        $mmn = "$1$2";
+    }
+    return $mmn;
 }
 
 
