@@ -29,9 +29,9 @@ MAIN:
     }
     elsif ( exists($options{t}) )
     {
-        testParsing();
+        #testParsing();
         #testMatching();
-        #testMatchingRevised();
+        testMatchingRevised();
     }
     else
     {
@@ -43,7 +43,7 @@ MAIN:
 # help() -- Print command-line help.
 sub help
 {
-    say STDERR "usage:  match.pl [-t] [-p <prod>] [-l <listing>] [-r <results>] [-u] [-h]";
+    say STDERR "usage:  match.pl [-t] [-p <prod>] [-l <listing>] [-r <results>] [-u] [-a] [-h]";
     say STDERR "  where -t indicates to run test";
     say STDERR "        -n indicates running new algorithm";
     say STDERR "        <prod> is alternative product file, default ", DATA_PRODUCTS_TEXT;
@@ -59,13 +59,18 @@ sub help
 # is determined by input file.
 sub getJsonText
 {
-    my ( $fname ) = @_;
-    open(my $fh, "<", $fname) or die "Couldn't open file: $!";
+    my ( $fname, $field_list ) = @_;
+    open(my $fh, "<", $fname);
     my @data;
     while ( defined(my $line = <$fh>) )
     {
         chomp($line);
-        push(@data, decode_json($line));
+        my $record = decode_json($line);
+        unless ( verifyRecordFields($record, $field_list) )
+        {
+            die "Invalid record in file $fname";
+        }
+        push(@data, $record);
     }
     close $fh;
     return \@data;
@@ -103,9 +108,11 @@ sub matchItems
     my ( $options ) = @_;
 
     my $t0 = gettimeofday();
-    my $products = getJsonText($options->{p});
+    my $products = getJsonText($options->{p},
+        ["product_name", "manufacturer", "model", "announced-date"]);
     $t0 = reportAndGetTime("Loaded products", $t0);
-    my $listings = getJsonText($options->{l});
+    my $listings = getJsonText($options->{l},
+        ["title", "manufacturer", "currency", "price"]);
     $t0 = reportAndGetTime("Loaded listings", $t0);
     my $match_heuristics = matchHeuristics->new();
 
@@ -131,7 +138,7 @@ sub matchItems
         say "Unused listings:";
         foreach my $list ( @$listings )
         {
-            if ( $list->{used}==0 )
+            if ( exists($list->{unused}) )
             {
                 say "  $list->{title}";
             }
@@ -204,11 +211,17 @@ sub testMatchingRevised
 #   $results is populated with all listings that have a product (stored under
 #     product entry)
 #   $report_stats has n_cam_1, n_none, and n_reason_no_manuf fields counted
-#   Each $listings entry has a field 'used' added, containing either 1 if
-#     the listing was used (added to $results) or 0 if not.
+#   Each $listings entry has a field 'unused' added, containing either 1 if
+#     the listing remains unused (added to $results) or deleted if used.
+#     The 'unused' form is used so that there is no extra flag printed in
+#     output in case the item is used.
 sub prodMatchListings
 {
     my ( $match_heuristics, $listings, $results, $report_stats ) = @_;
+    foreach my $list ( @$listings )
+    {
+        $list->{unused} = 1;
+    }
     foreach my $list ( @$listings )
     {
         #say "working on $list->{title}";
@@ -218,13 +231,12 @@ sub prodMatchListings
             my $res_item = $results->{$prod->{product_name}};
             push(@$res_item, $list);
             ++$report_stats->{n_cam_1};
-            $list->{used} = 1;
+            delete($list->{unused});
         }
         else
         {
             ++$report_stats->{n_none};
             ++$report_stats->{n_reason_no_manuf}  if ( $no_manuf );
-            $list->{used} = 0;
         }
     }
 }
@@ -241,6 +253,23 @@ sub reportAndGetTime
     my $t1 = gettimeofday();
     printf("%s:  %0.3fs\n", $heading, $t1-$t0);
     return $t1;
+}
+
+
+# verifyRecordFields() -- Check whether a given hash contains all the required fields.
+sub verifyRecordFields
+{
+    my $okay = 1;
+    my ( $hash, $field_list ) = @_;
+    foreach my $f ( @$field_list )
+    {
+        unless ( exists($hash->{$f}) )
+        {
+            $okay = 0;
+            last;
+        }
+    }
+    return $okay;
 }
 
 

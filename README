@@ -1,17 +1,68 @@
-Tuesday 30 June 2015
+Thursday 23 July 2015
 
 
 Sortable Challenge
 ==================
 
 
-GitHub Account
-~~~~~~~~~~~~~~
+To run this program, you need a recent Linux environment with a recent version of Perl.  The program may run in other
+environments, but has not been tested that way.
 
-- website:  github.com
-- see https://github.com/join
-- username:  wgrutherdale
-    - wgr not available:  did I create that from work?
-- email address:  will.rutherdale@utoronto.ca
-- password:  aardvark0Bat1Cat2Dog
-- created free plan, which has 0 private repositories
+The Perl environment must have the following packages:
+
+    Modern::Perl
+
+If that package is not currently installed, then you must install it.  E.g.
+
+$ cpan install Modern::Perl
+
+Once this has been done, you should be able to cd into this git repository.  If you type
+
+$ ls
+
+then you will see these files:
+
+data  design.txt  LICENSE  matchHeuristics.pm  match.pl  README  README.md
+testMatchHeuristics.t
+
+The subdirectory 'data' contains these files:
+
+listings.txt products.txt
+
+which are the data files obtained from the Sortable web site.  This is the
+default data that the program will run against.  You can specify different
+files using command-line options.
+
+To run some regression tests, do this:
+
+$ perl ./testMatchHeuristics.pl
+
+To run the actual matching program, do this:
+
+$ ./match.pl -h
+
+The above gives help only, and lets you see what command-line options are
+available.
+
+To run the actual program against the default data, run the same match.pl program without the help option:
+
+$ ./match.pl
+
+When you do this, the program will read products from data/products.txt, listings from data/listings.txt, process
+the data, display some progress information, and output the results to results.txt.
+
+If you want to run this program on different data, read the help instructions.
+
+The file design.txt contains design description.
+
+The file matchHeuristics.pm is an internal library module built as part of
+this solution.
+
+The file testMatchHeuristics.pl is a test file to verify matching cases.  It
+can be run like this:
+
+$ perl ./testMatchHeuristics.t
+
+Or like this:
+
+$ ./match.pl -t

@@ -147,3 +147,22 @@ Again, a problem was repeated construction of the same regex expressions during
 runtime.  The simple solution was to compute all the regex expressions during
 preprocessing and store them with each product in the product struct, after
 applying the qr// operator to pre-compile each regex.
+
+
+Exceptional Cases
+~~~~~~~~~~~~~~~~~
+
+The input data contains entries like this:
+{"title":"Nikon D7000 16.2mp Dx-format Cmos Digital SLR with 3.0-inch \
+LCD with Nikon 18-55mm Zoom Nikkor VR Lens and Nikon 55-200mm Zoom Nikkor \
+VR Lens (Black) with the Best Value Accessory Package Kit",
+"manufacturer":"Sunset Electronics","currency":"USD","price":"1686.99"}
+
+This entry does not match!  Why?  Because the manufacturer is listed as
+"Sunset Electronics".  The manufacturer field is given priority by the
+matching program.  The products file contains a D7000 manufactured by
+Nikon but none manufactured by Sunset Electronics.
+
+Only those D7000 cameras made by Nikon will be reported as matched.  All
+others will be reported as unmatched (unless entries are added to the
+products file).

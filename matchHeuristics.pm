@@ -8,12 +8,12 @@ use autodie;
 use Data::Dumper;
 use Time::HiRes qw/gettimeofday/;
 
-#use Exporter;
-#our @ISA = ("Exporter");
-#our @EXPORT = qw(&prodSystemInit &prodSystemTrackProduct &prodSystemMapManufListings
-#                 &prodSystemTrackProductList
-#                 &prodSystemListingBestMatch &parseExpressionFromProdField
-#                 applyParseRE);
+use Exporter;
+our @ISA = ("Exporter");
+our @EXPORT = qw(&prodSystemInit &prodSystemTrackProduct &prodSystemMapManufListings
+                 &prodSystemTrackProductList
+                 &prodSystemListingBestMatch &parseExpressionFromProdField
+                 applyParseRE);
 
 # new() -- Constructor for matchHeuristics class.
 sub new
@@ -397,44 +397,6 @@ sub computeMatchStrength
         $stren += MATCH_STRENGTH_PRODUCT_OFFSET+MATCH_STRENGTH_MODEL_WEIGHT*$product_name_len;
     }
     return $stren;
-}
-
-
-# "Samsung_WB600" --> "WB600"
-# "Nikon_Coolpix_S620" --> "S620"
-# "Canon_PowerShot_G12" --> "G12"
-# "Sanyo_VPC-Z400" --> "Z400"
-# "Kodak_DC290" --> "DC290"
-# "Kodak_EasyShare_M380" --> "M380"
-# "Olympus_E-600" --> "E600"
-# "Olympus_SP-600_UZ" --> "SP600"
-# "Fujifilm_FinePix_S200EXR" --> S200
-# "ABC123" --> "ABC123"
-# "Nikon_D7000" --> "D7000"
-# "blah blah blah" --> undef
-# getSimpleProductNameIndicator() -- Proposed additional product discriminator
-# function that is not in use now.
-sub getSimpleProductNameIndicator
-{
-    my ( $model ) = @_;
-    my $mmn = undef;
-    if ( $model =~ m/(?<![a-zA-Z\d])([a-zA-Z]+\d+)(?![a-zA-Z\d])/ )
-    {
-        $mmn = $1;
-    }
-    elsif ( $model =~ m/(?<![a-zA-Z\d])([a-zA-Z]+)[ :_-]+(\d+)(?![a-zA-Z\d])/ )
-    {
-        $mmn = "$1$2";
-    }
-    elsif ( $model =~ m/(?<![a-zA-Z\d])([a-zA-Z]+\d+[a-zA-Z]+)(?![a-zA-Z\d])/ )
-    {
-        $mmn = $1;
-    }
-    elsif ( $model =~ m/(?<![a-zA-Z\d])([a-zA-Z]+)[ :_-]+(\d+)(?![a-zA-Z\d])/ )
-    {
-        $mmn = "$1$2";
-    }
-    return $mmn;
 }
 
 
