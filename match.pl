@@ -3,7 +3,7 @@
 
 use Modern::Perl 2013;
 use autodie;
-use JSON::PP;
+use JSON;
 use Data::Dumper;
 use Getopt::Std;
 use Test::Harness;
@@ -29,9 +29,7 @@ MAIN:
     }
     elsif ( exists($options{t}) )
     {
-        #testParsing();
-        #testMatching();
-        testMatchingRevised();
+        testMatching();
     }
     else
     {
@@ -93,7 +91,9 @@ sub outputJsonResults
     {
         my $json_record = { product_name => $product_name,
                             listings => $listing_array };
-        print $fh $json->encode($json_record), "\n";
+        my $json_string = $json->encode($json_record);
+        $json_string =~ tr/\r\n//d;
+        print $fh $json_string, "\n";
     }
     close $fh;
 }
@@ -147,53 +147,9 @@ sub matchItems
 }
 
 
-# testParsing() -- Extra testing of parsing behaviour for fields.
-sub testParsing
-{
-    say "testParsing()";
-    testParseA("Nikon_D300", "Nikon D3000 10.2MP Digital SLR Camera Kit (Body) with WSP Mini Tripod & Cleaning set.");
-    testParseA("Nikon_D300", "Nikon D3000 10.2MP Digital SLR Camera Kit (Body) with WSP Mini Tripod & Cleaning set.");
-    testParseA("Nikon-D300", "Nikon D300 DX 12.3MP Digital SLR Camera with 18-135mm AF-S DX f/3.5-5.6G ED-IF Nikkor Zoom Lens");
-    testParseA("Nikon:D300", "Nikon D300 DX 12.3MP Digital SLR Camera with 18-135mm AF-S DX f/3.5-5.6G ED-IF Nikkor Zoom Lens");
-    testParseA("Nikon D300", "Nikon D300s 12.3mp Digital SLR Camera with 3inch LCD Display (Includes Manufacturer's Supplied Accessories) with Nikon Af-s Vr Zoom-nikkor 70-300mm F/4.5-5.6g If-ed Lens + PRO Shooter Package Including Dedicated I-ttl Digital Flash + OFF Camera Flash Shoe Cord + 16gb Sdhc Memory Card + Wide Angle Lens + Telephoto Lens + Filter Kit + 2x Extended Life Batteries + Ac-dc Rapid Charger + Soft Carrying Case + Tripod & Much More !!");
-    testParseA("Nikon D300", "Nikon D300s 12.3mp Digital SLR Camera with 3inch LCD Display (Includes Manufacturer's Supplied Accessories) with Nikon Af-s Vr Zoom-nikkor 70-300mm F/4.5-5.6g If-ed Lens + PRO Shooter Package Including Dedicated I-ttl Digital Flash + OFF Camera Flash Shoe Cord + 16gb Sdhc Memory Card + Wide Angle Lens + Telephoto Lens + Filter Kit + 2x Extended Life Batteries + Ac-dc Rapid Charger + Soft Carrying Case + Tripod & Much More !!");
-
-    testParseA("Tough-3000", "Olympus T-100 12MP Digital Camera with 3x Optical Zoom and 2.4 inch LCD (Red)");
-    testParseA("T100", "Olympus T-100 12MP Digital Camera with 3x Optical Zoom and 2.4 inch LCD (Red)");
-
-    testParseA("DMC-FZ40", "Panasonic Lumix FZ40 Black 24x Zoom Leica Lens Taxes Included!");
-    testParseA("DMC-FZ40", "Panasonic Lumix DMC FZ40 Black 24x Zoom Leica Lens Taxes Included!");
-
-    testParseA("PEN E-PL2", "Olympus PEN E-PL1 12.3MP Live MOS Micro Four Thirds Interchangeable Lens Digital Camera with 14-42mm f/3.5-5.6 Zuiko Digital Zoom Lens (Black)");
-    testParseA("PEN E-PL1", "Olympus PEN E-PL1 12.3MP Live MOS Micro Four Thirds Interchangeable Lens Digital Camera with 14-42mm f/3.5-5.6 Zuiko Digital Zoom Lens (Black)");
-
-    testParseA("D1", "Nikon Coolpix P80 10.1MP Digital Camera with 18x Wide Angle Optical Vibration Reduction Zoom (Black)");
-}
-
-
-# testParseA() -- Support routine for testParsing().
-sub testParseA
-{
-    my ( $field, $str ) = @_;
-    say "  testParseA($field)";
-    my $pe = parseExpressionFromProdField($field, 0);
-    my $re = qr/$pe/i;
-    my $matches = applyParseRE($re, $str);
-    say "    pe==($pe), matches==$matches";
-}
-
-
 # testMatching()
 # Apply various test cases to determine how well doesMatch() performs.
 sub testMatching
-{
-    runtests("testMatchHeuristics.t");
-}
-
-
-# testMatchingRevised()
-# Apply various test cases to determine how well doesMatch() performs.
-sub testMatchingRevised
 {
     runtests("testMatchHeuristics.t");
 }

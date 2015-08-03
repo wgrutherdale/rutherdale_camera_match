@@ -8,12 +8,14 @@ use autodie;
 use Data::Dumper;
 use Time::HiRes qw/gettimeofday/;
 
+use FindBin;
+use lib "FindBin::Bin";
+use NaiveBayesianAccumulator;
+
 use Exporter;
 our @ISA = ("Exporter");
-our @EXPORT = qw(&prodSystemInit &prodSystemTrackProduct &prodSystemMapManufListings
-                 &prodSystemTrackProductList
-                 &prodSystemListingBestMatch &parseExpressionFromProdField
-                 applyParseRE);
+our @EXPORT = qw(&parseExpressionFromProdField
+               &applyParseRE);
 
 # new() -- Constructor for matchHeuristics class.
 sub new
@@ -83,6 +85,7 @@ sub prodSystemInit
 {
     my $self = shift;
     $self->{manuf_division} = {};
+    $self->{model_hash} = {};
 }
 
 
@@ -142,6 +145,9 @@ sub prodSystemTrackProduct
     {
         $manuf_division->{$manuf} = [$prod];
     }
+    my $model_hash = $self->{model_hash};
+    my $simple_model = getSimpleProductNameIndicator($prod->{model});
+    ++$model_hash->{$simple_model}  if ( defined($simple_model) );
 }
 
 
@@ -168,6 +174,7 @@ sub prodSystemTrackProductList
         $prod_name_used{$prod->{product_name}} = 1;
     }
 
+    #say "model_hash", Dumper($self->{model_hash});
     say "done prodSystemTrackProductList()";
 }
 
@@ -200,14 +207,20 @@ sub prodSystemListingBestMatch
                 my $strength = matchListingProduct($listing, $product_list->[$i] );
                 if ( $strength>$match_strength )
                 {
-                    $match_strength = $strength;
-                    @prod_ind_list = ( $i ); # clear out old list of lower strength
-                    #say "pushing (first) $i ($product_list->[$i]{product_name}) with strength $strength";
+                    unless ( looksLikeAccessoryGeneral($self->{model_hash}, $listing->{title}) )
+                    {
+                        $match_strength = $strength;
+                        @prod_ind_list = ( $i ); # clear out old list of lower strength
+                        #say "pushing (first) $i ($product_list->[$i]{product_name}) with strength $strength";
+                    }
                 }
                 elsif ( $strength>0 and $strength==$match_strength )
                 {
-                    push(@prod_ind_list, $i);
-                    #say "pushing $i ($product_list->[$i]{product_name}) with strength $strength";
+                    unless ( looksLikeAccessoryGeneral($self->{model_hash}, $listing->{title}) )
+                    {
+                        push(@prod_ind_list, $i);
+                        #say "pushing $i ($product_list->[$i]{product_name}) with strength $strength";
+                    }
                 }
             }
         }
@@ -397,6 +410,160 @@ sub computeMatchStrength
         $stren += MATCH_STRENGTH_PRODUCT_OFFSET+MATCH_STRENGTH_MODEL_WEIGHT*$product_name_len;
     }
     return $stren;
+}
+
+
+# getSimpleProductNameIndicator() -- Support routine for product
+# discriminators.  Picks out model numbers from raw model strings.
+# Examples:
+#   "Samsung_WB600" --> "WB600"
+#   "Nikon_Coolpix_S620" --> "S620"
+#   "Canon_PowerShot_G12" --> "G12"
+#   "Sanyo_VPC-Z400" --> "Z400"
+#   "Kodak_DC290" --> "DC290"
+#   "Kodak_EasyShare_M380" --> "M380"
+#   "Olympus_E-600" --> "E600"
+#   "Olympus_SP-600_UZ" --> "SP600"
+#   "Fujifilm_FinePix_S200EXR" --> S200
+#   "ABC123" --> "ABC123"
+#   "Nikon_D7000" --> "D7000"
+#   "blah blah blah" --> undef
+sub getSimpleProductNameIndicator
+{
+    my ( $model ) = @_;
+    my $mmn = undef;
+    if ( $model =~ m/(?<![a-zA-Z\d])([a-zA-Z]+\d+)(?![a-zA-Z\d])/ )
+    {
+        $mmn = $1;
+    }
+    elsif ( $model =~ m/(?<![a-zA-Z\d])([a-zA-Z]+)[ :_-]+(\d+)(?![a-zA-Z\d])/ )
+    {
+        $mmn = "$1$2";
+    }
+    elsif ( $model =~ m/(?<![a-zA-Z\d])([a-zA-Z]+\d+[a-zA-Z]+)(?![a-zA-Z\d])/ )
+    {
+        $mmn = $1;
+    }
+    elsif ( $model =~ m/(?<![a-zA-Z\d])([a-zA-Z]+)[ :_-]+(\d+)(?![a-zA-Z\d])/ )
+    {
+        $mmn = "$1$2";
+    }
+    return $mmn;
+}
+
+use constant ACCESSORY_PROB_THRESHOLD => .75;
+
+# looksLikeAccessoryGeneral() -- High-level decision routine to see whether a
+# listing title description looks like an accessory.  Uses several different
+# tests and combines them with a naive Bayesian estimator.
+# Return 1 if it looks like an accessory, 0 if not.
+sub looksLikeAccessoryGeneral
+{
+    my ( $model_hash, $title ) = @_;
+    my $b_acc = NaiveBayesianAccumulator->new();
+    my $looks_A = looksLikeAccessory($model_hash, $title);
+    if ( $looks_A>0.0 )
+    {
+        $b_acc->accumulate(.85*$looks_A);
+    }
+    if ( looksLikeAccessoryPrefix($title) )
+    {
+        $b_acc->accumulate(.85);
+    }
+    my $looks_a_c_weak = looksLikeAccessoryCameraWeak($title);
+    if ( $looks_a_c_weak>0 )
+    {
+        $b_acc->accumulate(.70);
+    }
+    if ( $looks_a_c_weak<0 )
+    {
+        $b_acc->accumulate(.30);
+    }
+    my $looks = 0;
+    my $predict = $b_acc->predict();
+    #say "predict==$predict";
+    $looks = 1  if ( $predict>=ACCESSORY_PROB_THRESHOLD );
+    return $looks;
+}
+
+
+use constant ACCESSORY_MATCH_THRESHOLD => 5;
+
+# looksLikeAccessory() -- Check if listing title looks like accessory.
+# Return 1.0 if the full threshold has been attained.  If it has not, return a
+# smaller number in [0, 1] representing degree.
+sub looksLikeAccessory
+{
+    my ( $model_hash, $title ) = @_;
+    my @match = $title =~ m/(?<![[:alpha:]\d]])([[:alpha:]]+\d+)(?![[:alpha:]\d])/ig;
+    my $count = 0;
+    my $near_count = 0; # number that look like accessories but are not in model_hash
+    foreach my $m ( @match )
+    {
+        ++$count  if ( exists($model_hash->{$m}) );
+        ++$near_count;
+    }
+    my $strength = 0.0;
+    if ( $count>=ACCESSORY_MATCH_THRESHOLD )
+    {
+        $strength = 1.0;
+    }
+    elsif ( $count>0 or $near_count>0 )
+    {
+        $strength = 0.9**(ACCESSORY_MATCH_THRESHOLD-$count);
+    }
+    return $strength;
+}
+
+
+# looksLikeAccessoryPrefix() -- Check if listing title looks like the prefix
+# part of an accessory, i.e. if early words contain accessory indication.
+# Return 1 if so, 0 if not.
+sub looksLikeAccessoryPrefix
+{
+    my ( $title ) = @_;
+    my $looks = 0;
+    my $tasche_re = qq/tasche|case|batt|flash|wireless/;
+    if ( $title =~ m/^\w+\s+\d+\s*mm/i )
+    {
+        $looks = 1;
+    }
+    elsif ( $title =~ m/^\s*(\S+)\s+(\S+)\s+(\S+)/ )
+    {
+        $looks = 1  if ( $1 =~ m/$tasche_re/i or $2 =~ m/$tasche_re/i or $3 =~ m/$tasche_re/i );
+    }
+    elsif ( $title =~ m/^\s*(\S+)\s+(\S+)/ )
+    {
+        $looks = 1  if ( $1 =~ m/$tasche_re/i or $2 =~ m/$tasche_re/i );
+    }
+    elsif ( $title =~ m/^\s*(\S+)/ )
+    {
+        $looks = 1  if ( $1 =~ m/$tasche_re/i );
+    }
+    return $looks;
+}
+
+
+# looksLikeAccessoryCameraWeak() -- Weak test of accessory or camera.  Return
+# 1 if it looks like an accessory, -1 if it looks like a camera, 0 if neither.
+# This test uses relative positions of accessory vs. camera keywords to help
+# distinguish.
+sub looksLikeAccessoryCameraWeak
+{
+    my ( $title ) = @_;
+    my ( $pos_acc, $pos_cam ) = ( -1, -1 );
+    if ( $title =~ m/mm|lens|tasche|case|batt|flash|wireless|scuba|mask|shade|pouch|bungee|backpack/i )
+    {
+        $pos_acc = $-[0];
+    }
+    if ( $title =~ m/slr|camera|body|appareil|kamera/i )
+    {
+        $pos_cam = $-[0];
+    }
+    my $acc_cam_match = 0;
+    $acc_cam_match = 1  if ( $pos_acc>0 and ($pos_cam<0 or $pos_acc<$pos_cam) );
+    $acc_cam_match = -1  if ( $pos_cam>0 and ($pos_acc<0 or $pos_cam<$pos_acc) );
+    return $acc_cam_match;
 }
 
 

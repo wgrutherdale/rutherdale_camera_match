@@ -66,3 +66,10 @@ $ perl ./testMatchHeuristics.t
 Or like this:
 
 $ ./match.pl -t
+
+Note:
+
+You can also potentially improve load-time performance of match.pl by first
+running this:
+
+$ cpan install JSON::XS

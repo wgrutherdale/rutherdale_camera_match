@@ -7,13 +7,14 @@ use autodie;
 use FindBin;
 use lib "FindBin::Bin";
 use matchHeuristics;
-use Test::Simple tests => 28;
+use Test::Simple tests => 41;
 
 MAIN:
 {
     testMatching();
     testMatchingB();
     testMatchingC();
+    testParsing();
 }
 
 
@@ -165,7 +166,7 @@ sub testMatching
         {title => "Nikon EN-EL9a 1080mAh Ultra High Capacity Li-ion Battery Pack for Nikon D40, D40x, D60, D3000, & D5000 Digital SLR Cameras",
          manufacturer => "Nikon", currency => "CAD", price => 29.75},
          "Nikon_D3000");
-    ok($matches12a==1, "matches12a"); # TODO  Modify accessory detection and do not accept this.
+    ok($matches12a==0, "matches12a");
 
     my $matches12b = testMatchRev($match_heuristics,
         {title => "Nikon EN-EL9a 1080mAh Ultra High Capacity Li-ion Battery Pack for Nikon D40, D40x, D60, D3000, & D5000 Digital SLR Cameras",
@@ -334,6 +335,42 @@ sub testMatchRev
         say "Product undefined.";
     }
     return $matches;
+}
+
+
+# testParsing() -- Extra testing of parsing behaviour for fields.
+sub testParsing
+{
+    say "testParsing()";
+    testParseA(0, "TP0", "Nikon_D300", "Nikon D3000 10.2MP Digital SLR Camera Kit (Body) with WSP Mini Tripod & Cleaning set.");
+    testParseA(0, "TP1", "Nikon_D300", "Nikon D3000 10.2MP Digital SLR Camera Kit (Body) with WSP Mini Tripod & Cleaning set.");
+    testParseA(10, "TP2", "Nikon-D300", "Nikon D300 DX 12.3MP Digital SLR Camera with 18-135mm AF-S DX f/3.5-5.6G ED-IF Nikkor Zoom Lens");
+    testParseA(10, "TP3", "Nikon:D300", "Nikon D300 DX 12.3MP Digital SLR Camera with 18-135mm AF-S DX f/3.5-5.6G ED-IF Nikkor Zoom Lens");
+    testParseA(10, "TP4", "Nikon D300", "Nikon D300s 12.3mp Digital SLR Camera with 3inch LCD Display (Includes Manufacturer's Supplied Accessories) with Nikon Af-s Vr Zoom-nikkor 70-300mm F/4.5-5.6g If-ed Lens + PRO Shooter Package Including Dedicated I-ttl Digital Flash + OFF Camera Flash Shoe Cord + 16gb Sdhc Memory Card + Wide Angle Lens + Telephoto Lens + Filter Kit + 2x Extended Life Batteries + Ac-dc Rapid Charger + Soft Carrying Case + Tripod & Much More !!");
+    testParseA(10, "TP5", "Nikon D300", "Nikon D300s 12.3mp Digital SLR Camera with 3inch LCD Display (Includes Manufacturer's Supplied Accessories) with Nikon Af-s Vr Zoom-nikkor 70-300mm F/4.5-5.6g If-ed Lens + PRO Shooter Package Including Dedicated I-ttl Digital Flash + OFF Camera Flash Shoe Cord + 16gb Sdhc Memory Card + Wide Angle Lens + Telephoto Lens + Filter Kit + 2x Extended Life Batteries + Ac-dc Rapid Charger + Soft Carrying Case + Tripod & Much More !!");
+
+    testParseA(0, "TP6", "Tough-3000", "Olympus T-100 12MP Digital Camera with 3x Optical Zoom and 2.4 inch LCD (Red)");
+    testParseA(5, "TP7", "T100", "Olympus T-100 12MP Digital Camera with 3x Optical Zoom and 2.4 inch LCD (Red)");
+
+    testParseA(5, "TP8", "DMC-FZ40", "Panasonic Lumix FZ40 Black 24x Zoom Leica Lens Taxes Included!");
+    testParseA(8, "TP9", "DMC-FZ40", "Panasonic Lumix DMC FZ40 Black 24x Zoom Leica Lens Taxes Included!");
+
+    testParseA(0, "TP10", "PEN E-PL2", "Olympus PEN E-PL1 12.3MP Live MOS Micro Four Thirds Interchangeable Lens Digital Camera with 14-42mm f/3.5-5.6 Zuiko Digital Zoom Lens (Black)");
+    testParseA(9, "TP11", "PEN E-PL1", "Olympus PEN E-PL1 12.3MP Live MOS Micro Four Thirds Interchangeable Lens Digital Camera with 14-42mm f/3.5-5.6 Zuiko Digital Zoom Lens (Black)");
+
+    testParseA(0, "TP12", "D1", "Nikon Coolpix P80 10.1MP Digital Camera with 18x Wide Angle Optical Vibration Reduction Zoom (Black)");
+}
+
+
+# testParseA() -- Support routine for testParsing().
+sub testParseA
+{
+    my ( $expected_n_matches, $tname, $field, $str ) = @_;
+    my $pe = parseExpressionFromProdField($field, 0);
+    my $re = qr/$pe/i;
+    my $matches = applyParseRE($re, $str);
+    say "  testParseA($field):  pe==($pe), matches==$matches, expected_n_matches==$expected_n_matches";
+    ok($matches==$expected_n_matches, $tname);
 }
 
 
